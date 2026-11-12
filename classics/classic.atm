@@ -1,0 +1,52 @@
+;; The frame that the classics share, as in their C: the screen is cleared;
+;; a game runs, and P pauses it ("GAME PAUSED"); after the game,
+;; "PRESS [ENTER] TO PLAY AGAIN" until ENTER, whose frame only starts the
+;; next game, as `InitGame` does in the C.
+;;
+;;      include "classic.atm"
+;;      task Play () { ... }        ;; one game, which ends when it is over
+;;      await Classic(Play)
+;;
+;; The pause stops the game but keeps it drawn (`toggle ... with :rl.draw`).
+;;
+;; From raylib-games (zlib license): the shared part of the classics.
+
+var phase = :play               ;; :play, :pause, or :over (for the traces)
+
+task Classic (Play) {
+    spawn {
+        loop on :rl.draw {
+            rl.clear(rl.RAYWHITE)
+        }
+    }
+    loop {
+        do {
+            set phase = :play
+            pin play = spawn Play()
+            spawn {
+                loop {
+                    await :rl.key.dn [name='P']
+                    toggle play(false) with :rl.draw
+                    set phase = :pause
+                    watching :rl.key.dn [name='P'] {
+                        val s = "GAME PAUSED"
+                        loop on :rl.draw {
+                            rl.text(s, (rl.width()//2) - (rl.measure(s,40)//2), (rl.height()//2) - 40, 40, rl.GRAY)
+                        }
+                    }
+                    toggle play(true)
+                    set phase = :play
+                }
+            }
+            await(play)
+        }
+        set phase = :over
+        watching :rl.key.dn [name='ENTER'] {
+            val s = "PRESS [ENTER] TO PLAY AGAIN"
+            loop on :rl.draw {
+                rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
+            }
+        }
+        await :rl.frame         ;; the frame of ENTER only starts the next game
+    }
+}

@@ -9,6 +9,7 @@
 ;; became tasks, awaits, and a toggle.
 
 include "../raylib.atm"
+include "classic.atm"
 
 val W, H   = 800, 450
 val RADIUS = 24
@@ -20,7 +21,6 @@ rl.window [title="classic game: floppy", width=W, height=H, fps=60]
 val floppy = [x=0, y=0]         ;; where floppy is
 var score  = 0
 var hiscore = 0
-var phase  = :play              ;; :play, :pause, or :over (for the trace)
 
 ;; A pair of tubes: moves left, ends the game when floppy touches it, and
 ;; scores once when floppy passes it. As in the C, in each frame the top tube
@@ -101,34 +101,6 @@ task Play () {
     await :over
 }
 
-;; One game, with its pause: P stops the play, which keeps being drawn.
-task Game () {
-    set phase = :play
-    pin play = spawn Play()
-    spawn {
-        loop {
-            await :rl.key.dn [name='P']
-            toggle play(false) with :rl.draw
-            set phase = :pause
-            watching :rl.key.dn [name='P'] {
-                val s = "GAME PAUSED"
-                loop on :rl.draw {
-                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.GRAY)
-                }
-            }
-            toggle play(true)
-            set phase = :play
-        }
-    }
-    await(play)
-}
-
-spawn {
-    loop on :rl.draw {
-        rl.clear(rl.RAYWHITE)
-    }
-}
-
 ;; [trace] of the test mode: one line per frame, after its logic
 spawn {
     if rl.frame() > 0 {
@@ -139,14 +111,4 @@ spawn {
 }
 ;; [/trace]
 
-loop {
-    await Game()
-    set phase = :over
-    watching :rl.key.dn [name='ENTER'] {
-        val s = "PRESS [ENTER] TO PLAY AGAIN"
-        loop on :rl.draw {
-            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
-        }
-    }
-    await :rl.frame         ;; the frame of ENTER only starts the next game
-}
+await Classic(Play)

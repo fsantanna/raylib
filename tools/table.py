@@ -2,7 +2,8 @@
 # Writes the rows of doc/table.md from what can be measured:
 #
 #   lines and tokens   tools/count.py on the original (before the patch)
-#                      and on the port
+#                      and on the port, with the files it includes (as
+#                      classics/classic.atm), but not raylib.atm
 #   control            the rows of doc/state.md whose kind starts with
 #                      "control"; those whose port says **left** are left
 #   runs               tst/<game>/*.run: frames and screens; "yes" if every
@@ -38,8 +39,16 @@ def original(g):
 
 def port(g):
     if os.path.exists('%s/classics/%s.atm' % (ROOT, g)):
-        return ['%s/classics/%s.atm' % (ROOT, g)]
-    return sorted(glob.glob('%s/games/%s/*.atm' % (ROOT, g)))
+        files = ['%s/classics/%s.atm' % (ROOT, g)]
+    else:
+        files = sorted(glob.glob('%s/games/%s/*.atm' % (ROOT, g)))
+    # a shared file counts in every game that includes it, as if inlined
+    for f in list(files):
+        for inc in re.findall(r'^include "([^"]+)"', open(f).read(), re.M):
+            path = os.path.normpath(os.path.join(os.path.dirname(f), inc))
+            if not path.endswith('raylib.atm') and path not in files:
+                files.append(path)
+    return files
 
 def count(files):
     out = subprocess.run([sys.executable, ROOT + '/tools/count.py'] + files,

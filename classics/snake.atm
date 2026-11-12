@@ -9,6 +9,7 @@
 ;; `fruit.active` of the C became awaits and tasks.
 
 include "../raylib.atm"
+include "classic.atm"
 
 val W, H   = 800, 450
 val SQUARE = 31
@@ -20,7 +21,6 @@ rl.window [title="classic game: snake", width=W, height=H, fps=60]
 ;; game: in the frame of a restart, the last fruit is still drawn.
 var snake = []                  ;; the segments, from the head: [x=,y=]
 var fruit = [x=0, y=0]          ;; where the fruit is drawn
-var phase = :play               ;; :play, :pause, or :over (for the trace)
 
 ;; A random cell of the grid, as in the C: x, then y.
 func cell () {
@@ -98,11 +98,9 @@ task Logic () {
     }
 }
 
-;; One game: the logic, its drawing, and the pause.
-task Game () {
+;; One game: the logic and its drawing.
+task Play () {
     set snake = [ [x=OX/2, y=OY/2] ]
-    set phase = :play
-    pin logic = spawn Logic()
     spawn {
         loop on :rl.draw {
             loop i in (0, W//SQUARE) {
@@ -117,28 +115,7 @@ task Game () {
             rl.rectangle_v(fruit.x, fruit.y, SQUARE, SQUARE, rl.SKYBLUE)
         }
     }
-    spawn {
-        loop {
-            await :rl.key.dn [name='P']
-            toggle logic(false)
-            set phase = :pause
-            watching :rl.key.dn [name='P'] {
-                val s = "GAME PAUSED"
-                loop on :rl.draw {
-                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.GRAY)
-                }
-            }
-            toggle logic(true)
-            set phase = :play
-        }
-    }
-    await(logic)
-}
-
-spawn {
-    loop on :rl.draw {
-        rl.clear(rl.RAYWHITE)
-    }
+    await Logic()
 }
 
 ;; [trace] of the test mode: one line per frame, after its logic
@@ -153,14 +130,4 @@ spawn {
 }
 ;; [/trace]
 
-loop {
-    await Game()
-    set phase = :over
-    watching :rl.key.dn [name='ENTER'] {
-        val s = "PRESS [ENTER] TO PLAY AGAIN"
-        loop on :rl.draw {
-            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
-        }
-    }
-    await :rl.frame         ;; the frame of ENTER only starts the next game
-}
+await Classic(Play)
