@@ -12,7 +12,7 @@ index 68639f3..da01a48 100644
      #define SW_LOG(...)
  #endif
 diff --git a/src/platforms/rcore_memory.c b/src/platforms/rcore_memory.c
-index 5d9461c..a95f573 100644
+index 5d9461c..78e34c5 100644
 --- a/src/platforms/rcore_memory.c
 +++ b/src/platforms/rcore_memory.c
 @@ -95,6 +95,148 @@ static int kbhit(void);                         // Check if key has been pressed
@@ -220,11 +220,12 @@ index 5d9461c..a95f573 100644
      // TODO: Poll input events for current platform
  
      // Check for key pressed to exit
-@@ -539,6 +702,8 @@ int InitPlatform(void)
+@@ -538,7 +701,9 @@ int InitPlatform(void)
+     QueryPerformanceFrequency(&platform.timerFrequency);
      CORE.Time.base = time.QuadPart;
  #endif
++    rlt_init();                 // before InitTimer, which reads GetTime()
      InitTimer();
-+    rlt_init();
 +    if (rlt.on) rlt_input(1);
      //----------------------------------------------------------------------------
  

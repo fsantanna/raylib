@@ -9,7 +9,7 @@
 
 cd "$(dirname "$0")/.."
 mkdir -p build/port
-GAMES=${*:-$(ls classics/*.atm games/*/main.atm 2>/dev/null | sed 's|classics/||; s|games/||; s|/main.atm||; s|\.atm$||')}
+GAMES=${*:-$(ls classics/*.atm games/*/main.atm 2>/dev/null | grep -v classic.atm | sed 's|classics/||; s|games/||; s|/main.atm||; s|\.atm$||')}
 ret=0
 for g in $GAMES; do
     if [ -f classics/$g.atm ]; then

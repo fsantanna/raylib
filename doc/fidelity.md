@@ -41,6 +41,12 @@ that is checked, and what differs, game by game.
   The patch copies all `MAX_KEYBOARD_KEYS`, as the desktop platform does.
   This changes the originals too: without it, `IsKeyPressed(KEY_RIGHT)` is
   true while the key is held.
+- **The first frame time.** `InitPlatform` called `InitTimer` before the
+  test mode started, so `InitTimer` read the real clock, and the frame time
+  of the second frame was 1/60 minus the real time of the start: a few
+  microseconds, different in each run. The patch starts the test mode
+  first; from the second frame on, `GetFrameTime()` is exactly 1/60 (as a
+  float). Found with `platformer`, the first classic that reads it.
 - **Audio.** The container has no sound card: raylib fails to open the
   device, and sounds and music do nothing, in the original and in the port
   alike. No game reads the state of the audio in its logic (no

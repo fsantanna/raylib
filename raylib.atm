@@ -407,6 +407,12 @@ val rl = [
     },
 
     ;; Drawing (inside :rl.draw)
+    begin_mode2d = func (ox, oy, tx, ty, rot, zoom) {
+        `BeginMode2D((Camera2D){ (Vector2){RL_F($ox),RL_F($oy)}, (Vector2){RL_F($tx),RL_F($ty)}, RL_F($rot), RL_F($zoom) });`
+    },
+    end_mode2d = func () {
+        `EndMode2D();`
+    },
     clear = func (c) {
         `ClearBackground(rl_color($c));`
     },
