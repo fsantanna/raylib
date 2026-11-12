@@ -32,10 +32,9 @@ Seen and expected, as the manual says, listed for whoever writes a port:
   pinned value`): a resource kept in a table is a `val`.
 - `%` is the remainder of C (`fmod`, with the sign of the dividend), not
   the modulo of Lua; `//` floors.
-- A name that a function declares as a parameter hides a local of the
-  same name in an enclosing task only inside it, but a hook passed in and
-  named as a local of the task (`letters` in `Logo`) is shadowed by the
-  local: give hooks names that the task does not use.
+- A local declared in a task hides a parameter of the same name for the
+  rest of the body, silently (a hook `letters` of `Logo`, then its count
+  `var letters`, gave "expected function : got number").
 
 To watch, as the plan asks: the cost of a native call per shape drawn, the
 cost of small records passed to C, an environment that ticks in frames as
