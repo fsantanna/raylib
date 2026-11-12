@@ -139,6 +139,11 @@ task Screens (screens, first, fade) {
             toggle s(true)
         }
         await :rl.frame until s.pub
+        if s.pub ?? :table {
+            ;; [to=, now=true]: the next screen at once, with no fade, as the
+            ;; ChangeToScreen of the C; it updates from the next frame
+            set name, fresh = s.pub.to, false
+        } else {
         ;; the fade, over the screen, which is drawn but no more updated
         toggle s(false) with :rl.draw
         var alpha = 0
@@ -153,5 +158,6 @@ task Screens (screens, first, fade) {
             until f.into(alpha)
         }
         set name, fresh = s.pub, true
+        }
     }
 }

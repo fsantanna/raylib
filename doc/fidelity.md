@@ -450,3 +450,22 @@ read: 31", "Furniture MAP elements read: 25"), and so does the port.
   their level from the last game where a draw of 100 leaves them.
 - **No win.** The runs do not clean 80% of the room (that needs a path
   around the furniture); the ending they show is the loss.
+
+## light_my_ritual
+
+Same as the original on its runs `start` (1600 frames, 14 screens: the
+title, the player, the light refilled, a pause, S) and `timeover` (7100
+frames, 20 screens: the player lights what it can, the enemies put the
+lights out, the 99 seconds run out; the title; a second game).
+
+Trace: frame; in the game also the player, its light, the level.
+
+- **No run lights a level.** The generator of runs plans a route to the
+  lights, but the enemies wake up after 90 to 400 frames and put the lights
+  out faster than an open route lights them; the end by light (the ritual,
+  its fade, and the return to the logo with no fade) is ported, but not
+  compared.
+- The light of the player is never reset: a second game starts with what
+  was left from the first (35 in the run).
+- The lights come from a map in an image, read by the C of the original in
+  a prelude of the port.

@@ -1,0 +1,6 @@
+# The title, ENTER; the player moves, fills its light; a pause; S stops
+# the enemies.
+FRAMES=1600
+SEED=1
+INPUT=650:dn:ENTER,651:up:ENTER,800:dn:LEFT,850:up:LEFT,850:dn:UP,900:up:UP,1000:dn:RIGHT,1100:up:RIGHT,1150:dn:P,1151:up:P,1200:dn:P,1201:up:P,1250:dn:S,1251:up:S,1300:dn:DOWN,1400:up:DOWN
+SHOTS="1 500 600 652 700 750 800 900 1000 1100 1160 1250 1400 1600"

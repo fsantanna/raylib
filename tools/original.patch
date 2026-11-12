@@ -383,6 +383,57 @@ index 0dd7eeb..808cf29 100644
  }
  
  // Draw game (one frame)
+diff --git a/light_my_ritual/src/light_my_ritual.c b/light_my_ritual/src/light_my_ritual.c
+index 7e89b72..23fde67 100644
+--- a/light_my_ritual/src/light_my_ritual.c
++++ b/light_my_ritual/src/light_my_ritual.c
+@@ -15,6 +15,10 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++void TraceGameplay(int f);  // Atmos port: trace (screen_gameplay.c)
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #include <stdlib.h>     // Required for:
+@@ -271,6 +275,13 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        if (currentScreen == GAMEPLAY) TraceGameplay(RltFrame());
++        else printf("%d\n", RltFrame());
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
+diff --git a/light_my_ritual/src/screen_gameplay.c b/light_my_ritual/src/screen_gameplay.c
+index 3af588e..91cf7c0 100644
+--- a/light_my_ritual/src/screen_gameplay.c
++++ b/light_my_ritual/src/screen_gameplay.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>
+ #include "screens.h"
+ 
+ #include <math.h>
+@@ -820,3 +821,9 @@ static void EnemyReset(Enemy *enemy)
+         enemy->awakeFramesDelay = GetRandomValue(180, 1200);
+     }
+ }
++
++// Atmos port: trace of the gameplay
++void TraceGameplay(int f)
++{
++    printf("%d %d %d %.6f %d\n", f, (int)player.position.x, (int)player.position.y, player.lightEnergy, currentLightedLevel);
++}
 diff --git a/raylife/src/raylife.c b/raylife/src/raylife.c
 index 18569e6..f2ff680 100644
 --- a/raylife/src/raylife.c

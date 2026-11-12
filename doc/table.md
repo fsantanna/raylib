@@ -33,4 +33,4 @@ the runs: no number here is typed by hand.
 | wave_collector | 679 | 412 | 4998 | 3674 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
 | repair | 672 | 376 | 5601 | 3797 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
 | cat_vs_roomba | 857 | 503 | 7312 | 5518 | 5 | 1 | 2 (13420 frames, 31 screens) | yes |
-| light_my_ritual | 901 | 485 | 7087 | 4415 | None | None | 1 (1600 frames, 14 screens) | no |
+| light_my_ritual | 901 | 485 | 7087 | 4415 | 5 | 2 | 2 (8700 frames, 34 screens) | yes |

@@ -341,3 +341,24 @@ fade (0.02 in and out).
 | `roombaPosition`, `catPosition`, `catTargetPosition`, `mouseTileX/Y` | drawn, and data | `g`, `tx`, `ty` |
 | `furset[]`, `furmap[]`, `furnitureCount` | data, read from files; `furnitureCount` is never reset | `furset`, `furmap`, read anew in each game |
 | `score`, `result` | score; never reset, and `result` starts at -1 | `score`, `result`, outside the screens |
+
+## light_my_ritual
+
+The screens and the logo as in `wave_collector`, with this game's black
+fade; the end of the ritual goes back to the logo with no fade
+(`ChangeToScreen`), which `Screens` takes as `[to=:logo, now=true]`.
+
+| C | Kind | Port |
+|---|------|------|
+| `framesCounter` (title) | control: a blinking text from frame 200 | an await and a blink of 40 and 40 |
+| `titleAlpha` | drawn; never reset | `title_alpha`, outside the screen |
+| `pause` | control | a task that toggles the game between two P, at any time |
+| `timeOver`, `currentLightedLevel == LEVEL_FINISHED` | control: the game ends by time or by light | the game is a task that returns `:time` or `:lit` |
+| `startRitual`, `alphaRitual` | control: the fade after ENTER, which the C reads in the drawing | **left**: `ritual`, nil until ENTER (read in the drawing, as in the C), then the alpha |
+| `currentLightedLevel`, `previousLightedLevel` | data: computed from the lights in each frame; a change resets the enemies | `level`, `prev` |
+| `enemiesStopped` | control: S stops the enemies | **left**: `stopped` |
+| `lightsI/II/III[]` (`active`, `framesCounter`, `currentFrame`, `frameRec`) | drawn, and data: a light can go out | `lights`, with the loops of the C |
+| `enemies[]` (`active`, `framesCounter`, `awakeFramesDelay`) | data: an enemy wakes, walks to a light, and resets | `enemies`, with the loops of the C |
+| `framesCounter` (gameplay), `ritualTime` | data: the time of the game, and a blinking warning | `frames`, `ritual_time` |
+| `player.lightEnergy` | data; never reset between games | `energy`, outside the screen |
+| `maxLightEnergy`, `currentLightEnergy`, `nextStarsAlignment` | data, and drawn | `total`, `lit`, `stars` |
