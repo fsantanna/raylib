@@ -1,4 +1,1903 @@
-;; (to come: the gameplay)
-func gameplay_init () { }
-func gameplay_trace () { "" }
-task Gameplay () { await false }
+;; The gameplay of koala_seasons (`screen_gameplay.c`): the koala jumps from
+;; tree to tree, eats leaves, kicks enemies, turns into its final form, and
+;; the seasons go by.
+;;
+;; The game is one function of 1700 lines in the C, over 250 statics, that
+;; the init resets in part; here, the statics are the table `G`, and the
+;; frame goes in the order of the C. The three phases of a game (the
+;; countdown, the play, the fall of the koala) are a sequence in the task
+;; `Gameplay`; the state of the koala (`state`), read and changed all over
+;; the frame, stays.
+
+```:prelude
+#include <time.h>
+// The year and the month of now (the test mode fixes the date, as in the
+// original patched for the trace)
+static int ks_date (int test, int month) {
+    time_t rawtime;
+    if (test) rawtime = 1700000000;
+    else time(&rawtime);
+    struct tm *ptm = gmtime(&rawtime);
+    return month ? ptm->tm_mon : ptm->tm_year;
+}
+```
+
+val JUMPING, KICK, FINALFORM, GRABED, ONWIND = 0, 1, 2, 3, 4       ;; KoalaState
+val WINTER, SPRING, SUMMER, FALL, TRANSITION = 0, 1, 2, 3, 4       ;; SeasonState
+val NE, NB, NL, NF, NI, NR, NW = 16, 16, 14, 10, 10, 10, 10        ;; MAX_ENEMIES, ...
+val SEASONCHANGE, SEASONTRANSITION = 1200, 200
+val PI_F = f32(math.pi)
+
+func rect (x, y, w, h) { [x=x, y=y, w=w, h=h] }
+func recs (a, b) {
+    rl.check_collision_recs(a.x, a.y, a.w, a.h, b.x, b.y, b.w, b.h)
+}
+func list (n, f) {
+    val l = []
+    loop i in n { set l@i = f(i) }
+    l
+}
+func falses (n) { list(n, \{ false }) }
+func zeros (n) { list(n, \{ 0 }) }
+func rects (n) { list(n, \{ rect(0, 0, 0, 0) }) }
+func popup () { [x=0, y=0, active=false, alpha=0, scale=0, score=0] }
+func speed_particle () { [x=0, y=0, w=0, h=0, alpha=0, active=false, color=rl.WHITE, rot=0] }
+
+;; The statics of the C, as its initializers have them
+val G = [
+    gravity=0, season=0, state=0, frames=0, finish=0, grab=0, velocity=0, speed=0,
+    bamboo_timer=0, bamboo_spawn=0, color_timer=0, jump_speed=0, power=0, max_power=0, trans_count=0,
+    pos=[0, 0], pos_dingo=[0, 0], enemy_vel=zeros(NE), bee_velocity=0, fire_speed=0, wind_counter=0,
+    season_timer=0, season_change=0, resin_jump=0, resin_drag=0, resin_count=0, month=0,
+    month_timer=0, month_change=0, init_month=0, fire_counter=zeros(NF), fire_offset=0, bee_mov=0,
+    kill_counter=0, leaf_type=zeros(NL), pos_leaf=[0, 0, 0], trans_ani=0, global=0, start_counter=0,
+    anim_counter=0, final_end=0, random_message=0, back_offset=0, front_offset=0, start_num=3,
+    this_frame=1, cur_frame=0, this_wind=1, cur_wind=0, this_bee=1, this_snake=1, this_dingo=1,
+    this_owl=1, this_eagle=1, cur_eagle=0, cur_bee=0, cur_snake=0, cur_dingo=0, cur_owl=0,
+    cur1=0, cur2=0, cur3=0, transition_frames=0, this_koala=0, cur_koala=0, fog_speed=0,
+    fog_position=0, progresion_delay=0, progresion_frames=0, init_leaves=0, eagle_delay=0,
+    scroll_front=0, scroll_middle=0, scroll_back=0, scroll_speed=0, right_alpha=f32(0.5),
+    left_alpha=f32(0.5), speed_mod=0, ground=0, trans_rotation=0, clock=0, clock_speed=0,
+    number_alpha=0, number_scale=0, fog_alpha=0, speed_increase=0, speed_progresion=0,
+    progresion_chance=0, ui_fade=0, filter_alpha=0, glow_fade=0, pulse_fade=0, pulse_scale=0,
+    clock_init=0, clock_final=0,
+    snake_active=falses(NE), dingo_active=falses(NE), owl_active=falses(NE), branch_active=falses(NE),
+    bamboo_active=falses(NB), leaf_active=falses(NL), fire_active=falses(NF), ice_active=falses(NI),
+    wind_active=falses(NW), resin_active=falses(NR), hit_snake=falses(NE), hit_dingo=falses(NE),
+    hit_owl=falses(NE), hit_bee=false, hit_eagle=false, on_fire=falses(NF), on_ice=false,
+    on_resin=false, player_active=false, play=false, transforming=false, on_wind=false,
+    glowing=false, bee_active=false, eagle_active=false, eagle_alert=false, alert_active=false,
+    alert_bee_active=false, cool_down=false, leaf_side=falses(NL), trans_back=false, fog=false,
+    glow=false,
+    player=rect(0, 0, 0, 0), left_button=rect(0, 0, 0, 0), right_button=rect(0, 0, 0, 0),
+    power_button=rect(0, 0, 0, 0), fire=rects(NF), ice=rects(NI), resin=rects(NR), wind=rects(NW),
+    bamboo=rects(NB), snake=rects(NE), dingo=rects(NE), owl=rects(NE), leaf=rects(NL),
+    fire_anim=rect(0, 0, 0, 0), wind_anim=rect(0, 0, 0, 0), bee_anim=rect(0, 0, 0, 0),
+    snake_anim=rect(0, 0, 0, 0), dingo_anim=rect(0, 0, 0, 0), owl_anim=rect(0, 0, 0, 0),
+    bee=rect(0, 0, 0, 0), eagle=rect(0, 0, 0, 0), eagle_anim=rect(0, 0, 0, 0),
+    koala_idle=rect(0, 0, 0, 0), koala_fly=rect(0, 0, 0, 0), koala_transform=rect(0, 0, 0, 0),
+    alert=rect(0, 0, 0, 0), bee_alert=rect(0, 0, 0, 0),
+    final_color=0, final_color2=0, fly_color=0, counter_color=0,
+    c0=0, c1=0, c2=0, c3=0, i0=0, i1=0, i2=0, i3=0, f0=0, f1=0, f2=0, f3=0,
+    branch=list(NE, \{ [x=0, y=0] }), clock_x=0, clock_y=0,
+    enemy_hit=list(NE, \{ particle(0, 0, 0) }),
+    leaf_particles=list(NL, \{ [x=0, y=0, active=false, ps=list(32, \{ particle(0, 0, 0) })] }),
+    snow=system(128), back_snow=system(128), dandelion=system(128), dandelion_back=system(128),
+    planetree=system(128), back_planetree=system(128), flower=system(128), back_flower=system(128),
+    rain=system(128), back_rain=system(128), rain_storm=system(512 + 16), snow_storm=system(512),
+    rays=rays(8), back_rays=rays(8), speed_fx=[active=false, spawn=0, max=0, ps=list(64, \{ speed_particle() })],
+    popup_score=list(NE, \{ popup() }), popup_leaves=list(NL, \{ popup() }), popup_bee=popup(), popup_eagle=popup(),
+]
+
+;; ColorTransition of the C: from one color to another in 200 frames
+func channel (c, k) { (c >> (24 - (8 * k))) & 0xFF }
+func color_transition (a, b, t) {
+    var c = 0xFF
+    loop k in 3 {
+        val ca, cb = channel(a, k), channel(b, k)
+        val v = int(f32(f32(f32(f32(cb - ca) * t) / SEASONTRANSITION) + ca)) & 0xFF
+        set c = c | (v << (24 - (8 * k)))
+    }
+    c
+}
+
+;; ---------------------------------------------------------------------------
+;; Reset (and InitGameplayScreen)
+
+func gameplay_init () {
+    val testing = rl.frame() > 0
+    set G.month = `:number ks_date(a_truthy($testing), 1)`
+    set G.init_month = G.month
+    set years = 1900 + `:number ks_date(a_truthy($testing), 0)`
+    val year = years
+    set G.frames, G.finish, G.grab, G.bamboo_timer, G.bamboo_spawn = 0, 0, 10, 0, 0
+    set G.gravity, G.speed = 5, 3
+    set score, hiscore = 0, 0
+    set G.power, G.resin_count, G.right_alpha, G.left_alpha, G.speed_mod = 360, 0, f32(0.5), f32(0.5), f32(1.2)
+    set G.trans_count, G.wind_counter, G.max_power, G.player_active = 0, 0, 360, true
+    set G.scroll_front, G.scroll_middle, G.scroll_back, G.scroll_speed, G.ground = 0, 0, 0, f32(1.6), 0
+    set G.resin_jump, G.resin_drag, G.color_timer, G.play, G.on_ice, G.on_resin = 0, 0, 0, false, false, false
+    set G.jump_speed, G.transforming, G.eagle_alert, G.alert_active, G.fire_speed = 6, false, false, false, 4
+    set G.season_timer, G.season_change = 0, SEASONCHANGE
+    set G.month_change = SEASONCHANGE // 3
+    set G.glowing, G.cur_frame, G.cur1, G.cur2, G.cur3, G.cur_bee = true, 0, 1, 2, 3, 0
+    set G.fire_offset, G.bee_mov, G.kill_counter = 20, 0, 0
+    set currentLeaves = 0
+    set G.clock, G.fly_color, G.global, G.start_counter = 0, rl.GRAY, 0, 0
+    set G.number_alpha, G.number_scale, G.start_num, G.anim_counter = 1, f32(2.5), 3, 0
+    set G.final_end, G.random_message = 0, 0
+    set years = 0
+    set G.ui_fade, G.fog_alpha = 1, 0
+    set seasons = 0
+    set G.fog, G.clock_speed, G.eagle_delay = false, 0, 0
+    set G.back_offset = rl.random(10, 100)
+    set G.front_offset = rl.random(100, 200)
+    set G.progresion_delay, G.progresion_frames, G.speed_progresion = 0, 0, 0
+    set G.fog_speed, G.glow, G.glow_fade, G.pulse_fade, G.pulse_scale = 2, true, 0, 1, 1
+    set initYears = year
+    val INIT = [
+        [11, 225, [0x81AC56FF, 0x91A57DFF, 0xA18249FF, 0xC66733FF]],
+        [2, 315, [0xF2713EFF, 0xBE8772FF, 0x908265FF, 0xD6853AFF]],
+        [5, 45, [0x8282B5FF, 0x9191A6FF, 0x688E90FF, 0x398CADFF]],
+        [8, 135, [0xC4B031FF, 0xB2A343FF, 0x858F5AFF, 0x859C2AFF]],
+    ]
+    val si = INIT@initSeason
+    set G.init_month = si@0
+    set G.clock, G.clock_init = si@1, si@1
+    set G.clock_final = G.clock_init + 90
+    set G.c0, G.c1, G.c2, G.c3 = si@2@0, si@2@1, si@2@2, si@2@3
+    set G.month = G.init_month
+    set G.left_button = rect(0, 200, W // 2, H)
+    set G.right_button = rect(W // 2, 200, W // 2, H)
+    set G.power_button = rect(0, 0, W // 2, 200)
+    do {
+        val r = rl.random(0, 255)
+        val g = rl.random(0, 255)
+        val b = rl.random(0, 255)
+        set G.final_color = (r << 24) | (g << 16) | (b << 8) | 0xFF
+    }
+    val fs = ATLAS01.gameplay_props_fire_spritesheet
+    set G.fire_anim = rect(fs.x, fs.y, fs.w / 4, fs.h)
+    val ws = ATLAS01.gameplay_props_whirlwind_spritesheet
+    set G.wind_anim = rect(ws.x, ws.y, ws.w / 4, ws.h)
+    val be = ATLAS01.gameplay_enemy_bee
+    set G.bee_anim = rect(be.x, be.y, be.w / 5, be.h)
+    val ea = ATLAS01.gameplay_enemy_eagle
+    set G.eagle_anim = rect(ea.x, ea.y, ea.w / 2, ea.h)
+    val sn = ATLAS01.gameplay_enemy_snake
+    set G.snake_anim = rect(sn.x, sn.y, sn.w / 3, sn.h)
+    val dn = ATLAS01.gameplay_enemy_dingo
+    set G.dingo_anim = rect(dn.x, dn.y, dn.w / 3, dn.h)
+    val ow = ATLAS01.gameplay_enemy_owl
+    set G.owl_anim = rect(ow.x, ow.y, ow.w / 3, ow.h)
+    val ki = ATLAS01.gameplay_koala_idle
+    set G.koala_idle = rect(ki.x, ki.y, ki.w / 3, ki.h)
+    val kf = ATLAS01.gameplay_koala_fly
+    set G.koala_fly = rect(kf.x, kf.y, kf.w / 2, kf.h)
+    val kt = ATLAS01.gameplay_koala_transform
+    set G.koala_transform = rect(kt.x, kt.y, kt.w / 2, kt.h)
+    loop _,k in [:snow, :snow_storm, :back_snow, :planetree, :back_planetree, :dandelion, :flower, :back_flower,
+                 :rain, :rain_storm, :back_rain, :rays, :back_rays, :speed_fx] {
+        set (G@k).active = false
+    }
+    set G.clock_x, G.clock_y = W, 0
+    loop j in 128 {
+        val sn, bs, pt, bp = G.snow.ps@j, G.back_snow.ps@j, G.planetree.ps@j, G.back_planetree.ps@j
+        set sn.active, sn.x, sn.y, sn.size, sn.rot, sn.color, sn.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bs.active, bs.x, bs.y, bs.size, bs.rot, bs.color, bs.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        set pt.active, pt.x, pt.y, pt.size, pt.rot, pt.color, pt.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bp.active, bp.x, bp.y, bp.size, bp.rot, bp.color, bp.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        val d1, d2 = G.dandelion.ps@j, G.dandelion_back.ps@j
+        set d1.active, d1.x, d1.y, d1.size, d1.rot, d1.color, d1.alpha = false, 0, 0, rnd10(3, 9), 0, rl.WHITE, 1
+        set d1.phy = rl.random(0, 180)
+        set d2.active, d2.x, d2.y, d2.size, d2.rot, d2.color, d2.alpha = false, 0, 0, rnd10(2, 8), 0, rl.WHITE, f32(0.7)
+        set d2.phy = rl.random(0, 180)
+        val fl, bf, rn, br = G.flower.ps@j, G.back_flower.ps@j, G.rain.ps@j, G.back_rain.ps@j
+        set fl.active, fl.x, fl.y, fl.size, fl.rot, fl.color, fl.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bf.active, bf.x, bf.y, bf.size, bf.rot, bf.color, bf.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        set rn.active, rn.x, rn.y, rn.size, rn.rot, rn.color, rn.alpha = false, 0, 0, rnd10(3, 9), -20, rl.WHITE, 1
+        set br.active, br.x, br.y, br.size, br.rot, br.color, br.alpha = false, 0, 0, rnd10(2, 8), -20, rl.WHITE, f32(0.7)
+    }
+    loop _,p in G.speed_fx.ps {
+        set p.x, p.y, p.color, p.alpha = 0, 0, rl.WHITE, 1
+        set p.w, p.h = W, rl.random(10, 50) // 10
+        set p.rot, p.active = 0, false
+    }
+    loop j in 512 {
+        val p = G.rain_storm.ps@j
+        set p.active, p.x, p.y, p.size, p.rot, p.color, p.alpha = false, 0, 0, rnd10(3, 9), -40, rl.WHITE, 1
+    }
+    loop j in 512 {
+        val p = G.snow_storm.ps@j
+        set p.active, p.x, p.y, p.size, p.rot, p.color, p.alpha = false, 0, 0, rnd10(2, 8), 40, rl.WHITE, 1
+    }
+    loop i in 8 {
+        val r, b = G.rays.ps@i, G.back_rays.ps@i
+        set r.x, r.y, r.color, r.alpha, r.size, r.rot, r.active, r.fading, r.delay = 0, 0, 0xFFFFB6FF, 0, rl.random(30, 70) // 10, 0, false, false, 0
+        set b.x, b.y, b.color, b.alpha, b.size, b.rot, b.active, b.fading, b.delay = 0, 0, 0xFFFFB6FF, 0, rl.random(10, 20) // 10, 0, false, false, 0
+    }
+    loop i in 128 { set killHistory@i = 0 }
+    loop i in NB {
+        set G.bamboo@i = rect(150 + (200 * i), 0, 50, H)
+        set G.bamboo_active@i = i <= 5
+    }
+    loop i in NF {
+        set G.fire@i = rect(-200, H - 30, 30, 720)
+        set G.fire_active@i, G.on_fire@i, G.fire_counter@i = false, false, 0
+    }
+    loop i in NI {
+        set G.ice@i = rect(-100, 0, 10, H)
+        set G.ice_active@i = false
+    }
+    loop i in NR {
+        set G.resin@i = rect(-100, 0, 32, 50)
+        set G.resin_active@i = false
+    }
+    loop i in NW {
+        set G.wind@i = rect(-100, 0, 70, 100)
+        set G.wind_active@i = false
+    }
+    loop i in NE {
+        set G.snake@i = rect(0, 0, 50, 60)
+        set G.snake_active@i, G.hit_snake@i = false, false
+        set G.dingo@i = rect(-100, 0, 64, 90)
+        set G.dingo_active@i, G.hit_dingo@i = false, false
+        set G.owl@i = rect(-100, 0, 40, 60)
+        set G.owl_active@i, G.branch_active@i, G.hit_owl@i = false, false, false
+        set (G.branch@i).x, (G.branch@i).y = -100, 0
+        val h = G.enemy_hit@i
+        set h.x = rl.random(-20, 20)
+        set h.y = rl.random(-20, 20)
+        set h.sx = f32(rl.random(-500, 500) / 100)
+        set h.sy = f32(rl.random(-500, 500) / 100)
+        set h.size = f32(rl.random(1, 45) / 30)
+        set h.rot = rl.random(0, 360)
+        set h.color, h.alpha, h.active = rl.RED, 1, false
+        val ps = G.popup_score@i
+        set ps.x = rl.random(-20, 20)
+        set ps.y = rl.random(-20, 20)
+        set ps.scale = f32(rl.random(1, 45) / 30)
+        set ps.alpha, ps.active = 1, false
+    }
+    loop i in NL {
+        set G.leaf@i = rect(0, 0, 30, 30)
+        set G.leaf_active@i, G.leaf_type@i = false, -1
+        val lp = G.leaf_particles@i
+        set lp.x, lp.y, lp.active = 0, 0, false
+        val pl = G.popup_leaves@i
+        set pl.x = rl.random(-20, 20)
+        set pl.y = rl.random(-20, 20)
+        set pl.scale = f32(rl.random(1, 45) / 30)
+        set pl.alpha, pl.score, pl.active = 1, 0, false
+        loop _,p in lp.ps {
+            set p.active = false
+            set p.x = rl.random(-20, 20)
+            set p.y = rl.random(-20, 20)
+            set p.sx = f32(rl.random(-500, 500) / 100)
+            set p.sy = f32(rl.random(-500, 500) / 100)
+            set p.size = f32(rl.random(3, 10) / 5)
+            set p.rot = rl.random(0, 360)
+            set p.color, p.alpha = rl.WHITE, 1
+        }
+    }
+    set G.player = rect(f32(W * f32(0.26)), 100, 35, 60)
+    set G.bee = rect(-200, 0, 50, 32)
+    set G.bee_active = false
+    do {
+        val p = G.popup_bee
+        set p.x = rl.random(-20, 20)
+        set p.y = rl.random(-20, 20)
+        set p.scale = f32(rl.random(1, 45) / 30)
+        set p.alpha, p.active = 1, false
+    }
+    set G.eagle = rect(-128, 0, 200, 80)
+    set G.eagle_active = false
+    do {
+        val p = G.popup_eagle
+        set p.x = rl.random(-20, 20)
+        set p.y = rl.random(-20, 20)
+        set p.scale = f32(rl.random(1, 45) / 30)
+        set p.alpha, p.active = 1, false
+    }
+    set G.counter_color = 0xFFE0B9FF
+}
+
+;; ---------------------------------------------------------------------------
+;; The frame
+
+func ease (t, b, c, d) { f32(f32(f32(c * t) / d) + b) }   ;; LinearEaseIn
+func check_pos (v) { ((G.pos@0) == v) || ((G.pos@1) == v) }   ;; CheckArrayValue(posArray, 2, v)
+func row (p) { 25 + ((H // 5) * p) }
+
+;; the koala dies: it falls, and `killer` says by what
+func die (by) {
+    set G.velocity, G.jump_speed, G.play, G.player_active = 8, 2, false, false
+    set killer = by
+}
+
+;; an enemy kicked or hit in the final form: its particle and its score
+func hit_fx (k, x, y, sx, sy, size, sc) {
+    val h = G.enemy_hit@k
+    set h.x, h.y, h.sx, h.sy = x, y, sx, sy
+    set h.size = size
+    set h.rot, h.alpha, h.active = 0, 1, true
+    val p = G.popup_score@k
+    set p.x, p.y, p.scale, p.alpha, p.score, p.active = x, y, 1, 1, sc, true
+}
+func kill (kind, sc) {
+    set killHistory@(G.kill_counter) = kind
+    set G.kill_counter += 1
+    set score += sc
+}
+func popup_at (p, x, y, sc) {
+    set p.x, p.y, p.scale, p.alpha, p.score, p.active = x, y, 1, 1, sc, true
+}
+
+func countdown_step () {
+    set G.start_counter += 1
+    if (G.start_counter > 20) && (G.start_counter < 110) {
+        set G.anim_counter += 1
+        set G.number_alpha = f32(G.number_alpha - f32(0.033))
+        set G.number_scale = f32(G.number_scale - f32(0.0825))
+        set G.start_num = if G.anim_counter <= 30 => 3 => if G.anim_counter <= 60 => 2 => 1
+    } else {
+        if G.start_counter >= 110 { set G.play = true }
+    }
+    if G.number_alpha <= 0 { set G.number_alpha = 1 }
+    if G.number_scale <= 0 { set G.number_scale = f32(2.5) }
+}
+
+;; the season of the month: its particles, its colors to come
+val SEASON_MONTHS = [                   ;; months, end month, season number, next colors
+    [[11, 0], 1, SUMMER, 0, [0xF2713EFF, 0xBE8772FF, 0x908265FF, 0xD6853AFF]],
+    [[2, 3], 4, FALL, 1, [0x8282B5FF, 0x9191A6FF, 0x688E90FF, 0x398CADFF]],
+    [[5, 6], 7, WINTER, 2, [0xC4B031FF, 0xB2A343FF, 0x858F5AFF, 0x859C2AFF]],
+    [[8, 9], 10, SPRING, 3, [0x81AC56FF, 0x91A57DFF, 0xA18249FF, 0xC66733FF]],
+]
+func seasons_step () {
+    val m = G.month
+    var found = nil
+    loop _,sm in SEASON_MONTHS {
+        if !found && (((m == sm@0@0) || (m == sm@0@1)) || ((m == sm@1) && (G.month_timer <= SEASONTRANSITION))) {
+            set found = sm
+        }
+    }
+    if found {
+        val sn = found@2
+        if sn == SUMMER {
+            set G.dandelion.active, G.dandelion_back.active, G.rays.active, G.back_rays.active = true, true, true, true
+            set G.transition_frames = 0
+            set G.random_message = rl.random(0, 10)
+            set G.fog = false
+        } else {
+            if sn == FALL {
+                if rainChance <= 40 {
+                    set G.rain_storm.active, G.back_rain.active, G.fog = true, false, true
+                } else {
+                    set G.planetree.active, G.back_planetree.active, G.fog = true, true, false
+                }
+                set G.transition_frames = 0
+                set G.random_message = rl.random(0, 10)
+            } else {
+                if sn == WINTER {
+                    if rainChance <= 40 {
+                        set G.snow_storm.active, G.back_snow.active, G.fog = true, true, true
+                    } else {
+                        set G.snow.active, G.back_snow.active, G.fog = true, true, false
+                    }
+                    set G.transition_frames = 0
+                    set G.random_message = rl.random(0, 10)
+                } else {
+                    set G.flower.active, G.back_flower.active = true, true
+                    set G.transition_frames = 0
+                    set G.random_message = rl.random(0, 9)
+                    set G.fog = false
+                }
+            }
+        }
+        set G.i0, G.i1, G.i2, G.i3 = G.c0, G.c1, G.c2, G.c3
+        val f = found@4
+        set G.f0, G.f1, G.f2, G.f3 = f@0, f@1, f@2, f@3
+        set G.season = sn
+        set currentSeason = found@3
+    } else {
+        loop _,k in [:flower, :back_flower, :snow, :back_snow, :planetree, :back_planetree, :dandelion,
+                     :dandelion_back, :rain, :rain_storm, :back_rain, :rays, :back_rays, :snow_storm] {
+            set (G@k).active = false
+        }
+        set G.fog = false
+        set G.transition_frames = int(G.transition_frames + G.speed_mod)
+        if G.transition_frames <= SEASONTRANSITION {
+            set G.c0 = color_transition(G.i0, G.f0, G.transition_frames)
+            set G.c1 = color_transition(G.i1, G.f1, G.transition_frames)
+            set G.c2 = color_transition(G.i2, G.f2, G.transition_frames)
+            set G.c3 = color_transition(G.i3, G.f3, G.transition_frames)
+        }
+        set G.season = TRANSITION
+    }
+}
+
+val CLOCK_AT = [[10, 225], [1, 315], [4, 45], [7, 135]]     ;; months that change the season
+
+func animations_step () {
+    set G.this_wind += 1
+    if G.this_wind >= 12 {
+        set G.cur_wind += 1
+        set G.this_wind = 0
+    }
+    if G.cur_wind > 3 { set G.cur_wind = 0 }
+    set G.wind_anim.x = ATLAS01.gameplay_props_whirlwind_spritesheet.x + (G.wind_anim.w * G.cur_wind)
+    set G.this_frame += 1
+    if G.this_frame >= 8 {
+        set G.cur_frame, G.cur1, G.cur2, G.cur3 = G.cur_frame + 1, G.cur1 + 1, G.cur2 + 1, G.cur3 + 1
+        set G.this_frame = 0
+    }
+    if G.cur_frame > 3 { set G.cur_frame = 0 }
+    if G.cur1 > 3 { set G.cur1 = 0 }
+    if G.cur2 > 3 { set G.cur2 = 0 }
+    if G.cur3 > 3 { set G.cur3 = 0 }
+}
+
+func flyers_step () {                   ;; the enemies of the air and their animations
+    set G.cur_eagle += 1
+    if G.cur_eagle >= 6 {
+        set G.this_eagle += 1
+        set G.cur_eagle = 0
+    }
+    if G.this_eagle > 1 { set G.this_eagle = 0 }
+    set G.eagle_anim.x = ATLAS01.gameplay_enemy_eagle.x + (G.eagle_anim.w * G.this_eagle)
+    set G.cur_bee += 1
+    if G.cur_bee >= 3 {
+        set G.this_bee += 1
+        set G.cur_bee = 0
+    }
+    if G.this_bee > 3 { set G.this_bee = 0 }
+    set G.bee_anim.x = ATLAS01.gameplay_enemy_bee.x + (G.bee_anim.w * G.this_bee)
+    set G.this_snake += 1
+    if G.this_snake >= 24 {
+        set G.cur_snake += 1
+        set G.this_snake = 0
+    }
+    if G.cur_snake > 1 { set G.cur_snake = 0 }
+    set G.snake_anim.x = ATLAS01.gameplay_enemy_snake.x + (G.snake_anim.w * G.cur_snake)
+    set G.cur_dingo += 1
+    if G.cur_dingo >= 24 {
+        set G.this_dingo += 1
+        set G.cur_dingo = 0
+    }
+    if G.this_dingo > 1 { set G.this_dingo = 0 }
+    set G.dingo_anim.x = ATLAS01.gameplay_enemy_dingo.x + (G.dingo_anim.w * G.this_dingo)
+    set G.cur_owl += 1
+    if G.cur_owl >= 24 {
+        set G.this_owl += 1
+        set G.cur_owl = 0
+    }
+    if G.this_owl > 1 { set G.this_owl = 0 }
+    set G.owl_anim.x = ATLAS01.gameplay_enemy_owl.x + (G.owl_anim.w * G.this_owl)
+
+    val a, e, P = G.alert, G.eagle, G.player
+    if G.alert_active {
+        if G.eagle_alert {
+            set a.x, a.w, a.h, a.y = f32(a.x - 100), f32(a.w + 100), f32(a.h + 5), f32(a.y - 5)
+            if a.h >= 100 { set G.eagle_alert = false }
+        } else {
+            set a.h, a.y = f32(a.h - 1), f32(a.y + 1)
+            if a.h <= 0 {
+                set G.eagle_alert, G.eagle_active, G.alert_active = true, true, false
+            }
+        }
+    }
+    if G.eagle_active && !G.hit_eagle {
+        set e.x = f32(e.x - (10 * G.speed))
+        if recs(e, P) && (G.state != FINALFORM) && (G.state != KICK) {
+            die(6)
+        } else {
+            if recs(e, P) && (G.state == FINALFORM) {
+                set G.hit_eagle, G.bee_velocity = true, 8
+                kill(5, 300)
+                popup_at(G.popup_eagle, e.x, e.y, 300)
+            }
+        }
+    } else {
+        if G.hit_eagle {
+            if (e.y + e.h) > H {
+                set G.eagle_active, G.hit_eagle = false, false
+            }
+            set e.x = f32(e.x + 2)
+            set G.bee_velocity -= 1
+            set e.y = f32(e.y - G.bee_velocity)
+        }
+    }
+    if (e.x + e.w) <= 0 { set G.eagle_active = false }
+
+    val ba, bee = G.bee_alert, G.bee
+    if G.alert_bee_active {
+        set ba.x, ba.w, ba.h, ba.y = f32(ba.x - 100), f32(ba.w + 100), f32(ba.h + 2.5), f32(ba.y + 1.25)
+        if ba.h >= 100 {
+            set G.bee_active, G.alert_bee_active = true, false
+        }
+    }
+    if G.bee_active && !G.hit_bee {
+        set bee.x = f32(bee.x - (3 * G.speed))
+        set G.bee_mov = int(math.sin(f32(f32(f32(2 * PI_F) / 400) * bee.x)) * 5)
+        set bee.y = f32(bee.y + G.bee_mov)
+        if recs(bee, P) && (G.state != FINALFORM) && (G.state != KICK) {
+            die(5)
+        } else {
+            if recs(bee, P) && (G.state == FINALFORM) {
+                set G.hit_bee, G.bee_velocity = true, 8
+                kill(4, 300)
+                popup_at(G.popup_bee, bee.x, bee.y, 300)
+            }
+        }
+    } else {
+        if G.hit_bee {
+            if (bee.y + bee.h) > H {
+                set G.bee_active, G.hit_bee = false, false
+            }
+            set bee.x = f32(bee.x + 2)
+            set G.bee_velocity -= 1
+            set bee.y = f32(bee.y - G.bee_velocity)
+        }
+    }
+    if (bee.x + bee.w) <= 0 { set G.bee_active = false }
+}
+
+func final_form () {
+    set G.state, G.transforming, G.init_leaves = FINALFORM, true, currentLeaves
+    set G.cur_koala, G.this_koala = 0, 0
+}
+
+func power_step () {
+    if G.power >= G.max_power { set G.power = G.max_power }
+    if (currentLeaves >= 100) && !G.cool_down {
+        set G.fly_color = rl.ORANGE
+        if G.glow {
+            set G.glow_fade = f32(G.glow_fade + f32(0.01))
+            if G.glow_fade >= 1 { set G.glow = false }
+        } else {
+            set G.glow_fade = f32(G.glow_fade - f32(0.01))
+            if G.glow_fade <= 0 { set G.glow = true }
+        }
+        set G.pulse_fade = f32(G.pulse_fade - f32(0.01))
+        set G.pulse_scale = f32(G.pulse_scale + f32(0.005))
+        if G.pulse_fade <= 0 {
+            set G.pulse_fade, G.pulse_scale = 1, 1
+        }
+        val pb = G.power_button
+        if rl.gesture_detected(rl.GESTURE_TAP) && rl.check_collision_point_rec(rl.touch_x(0), rl.touch_y(0), pb.x, pb.y, pb.w, pb.h) && (G.state != FINALFORM) {
+            final_form()
+        }
+        if (rl.key_pressed('ENTER') || (rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), pb.x, pb.y, pb.w, pb.h) && rl.mouse_pressed(0))) && (G.state != FINALFORM) {
+            final_form()
+        }
+    }
+    if G.cool_down {
+        set G.power += 20
+        if G.power >= G.max_power { set G.cool_down = false }
+    }
+    set G.color_timer += 1
+    if G.color_timer > 10 {
+        val r = rl.random(0, 255)
+        val g = rl.random(0, 255)
+        val b = rl.random(0, 255)
+        set G.final_color = (r << 24) | (g << 16) | (b << 8) | (G.final_color & 0xFF)
+        set G.color_timer = 0
+    }
+}
+
+func props_step () {                    ;; ice, resin, wind, fire
+    val P = G.player
+    loop i in NI {
+        val r = G.ice@i
+        if !(G.ice_active@i) { set r.x = -100 }
+        if r.x <= -r.w { set G.ice_active@i = false }
+        if recs(r, P) && (G.state == GRABED) { set G.on_ice = true }
+    }
+    loop i in NR {
+        val r = G.resin@i
+        if !(G.resin_active@i) { set r.x = -100 }
+        if r.x <= -r.w { set G.resin_active@i = false }
+        if recs(r, P) && (G.resin_count >= 30) && (G.state != FINALFORM) {
+            if !G.on_resin { rl.play_sound(fx_resin) }
+            set G.on_resin, G.grab, G.state = true, 10, GRABED
+        }
+    }
+    loop i in NW {
+        val r = G.wind@i
+        if !(G.wind_active@i) {
+            set r.x = -500
+        } else {
+            set r.x = f32(r.x - f32(9 * G.speed_mod))
+        }
+        if r.x <= -r.w { set G.wind_active@i = false }
+        if recs(r, P) && (G.state != ONWIND) && (G.wind_counter >= 35) && (G.state != FINALFORM) {
+            set G.state, G.wind_counter, G.velocity, G.grab, G.jump_speed = ONWIND, 0, 15, 0, 10
+            set G.right_alpha, G.on_ice, G.on_resin, G.resin_jump, G.resin_drag = 1, false, false, 0, 0
+        }
+    }
+    loop i in NF {
+        val f = G.fire@i
+        if !(G.fire_active@i) { set f.x = -200 }
+        if (f.x <= (P.x + P.w)) && !(G.on_fire@i) { set G.on_fire@i = true }
+        if (G.on_fire@i) && (f.y > -50) && !G.transforming {
+            set f.y = f32(f.y - G.fire_speed)
+            set G.fire_counter@i = 0
+        }
+        if f.x <= -f.w {
+            set G.fire_active@i, G.on_fire@i = false, false
+        }
+        if recs(P, f) && (G.state != FINALFORM) { die(0) }
+        loop k in NE {
+            if recs(f, G.snake@k) && !(G.hit_snake@k) {
+                set G.hit_snake@k, G.enemy_vel@k = true, 8
+            }
+        }
+    }
+}
+
+func bamboo_step () {
+    val P = G.player
+    val ob = ATLAS02.gameplay_props_owl_branch
+    loop i in NB {
+        if G.bamboo_active@i {
+            val b = G.bamboo@i
+            set b.x = f32(b.x - G.speed)
+            if recs(P, b) && (G.state != FINALFORM) {
+                if G.grab >= 10 {
+                    set P.x = f32(b.x - 25)
+                    set G.state = GRABED
+                }
+            }
+            if recs(P, b) && (G.state == FINALFORM) {
+                if G.power <= 1 {
+                    set G.state, G.velocity, G.jump_speed, G.scroll_speed, G.speed_mod = JUMPING, 15, 6, f32(1.6), f32(1.2)
+                    set G.cool_down, G.fly_color, G.speed_fx.active = true, rl.GRAY, false
+                }
+            }
+            loop k in NE {
+                if recs(G.snake@k, b) && (G.snake_active@k) && !(G.hit_snake@k) { set (G.snake@k).x = f32(b.x - 15) }
+                if recs(G.dingo@k, b) && (G.dingo_active@k) && !(G.hit_dingo@k) { set (G.dingo@k).x = f32(b.x - 15) }
+                if recs(G.owl@k, b) && (G.owl_active@k) && !(G.hit_owl@k) { set (G.owl@k).x = f32(b.x - 22) }
+                val bp = G.branch@k
+                if rl.check_collision_recs(bp.x, bp.y, ob.w, ob.h, b.x, b.y, b.w, b.h) && (G.branch_active@k) {
+                    set bp.x = f32(b.x - 24)
+                }
+            }
+            loop j in NL {
+                if recs(G.leaf@j, b) && (G.leaf_active@j) {
+                    set (G.leaf@j).x = f32(b.x + (if G.leaf_side@j => 18 => -18))
+                }
+            }
+            loop z in NF {
+                if recs(G.fire@z, b) && (G.fire_active@z) { set (G.fire@z).x = f32(b.x - 5) }
+            }
+            loop n in NI {
+                if recs(G.ice@n, b) && (G.ice_active@n) { set (G.ice@n).x = b.x }
+            }
+            loop m in NR {
+                if recs(G.resin@m, b) && (G.resin_active@m) { set (G.resin@m).x = b.x }
+            }
+            if b.x <= -(b.w + 30) { set G.bamboo_active@i = false }
+        }
+    }
+}
+
+func enemies_step () {
+    val P = G.player
+    loop k in NE {
+        val s, d, o = G.snake@k, G.dingo@k, G.owl@k
+        if s.x <= -s.w { set G.snake_active@k = false }
+        if d.x <= -d.w { set G.dingo_active@k = false }
+        if o.x <= -o.w { set G.owl_active@k = false }
+        if (G.branch@k).x <= -o.w { set G.branch_active@k = false }
+        if !(G.snake_active@k) { set s.x = -500 }
+        if !(G.dingo_active@k) { set d.x = -500 }
+        if !(G.owl_active@k) { set o.x = -500 }
+        if recs(P, s) && (G.state != KICK) && !(G.hit_snake@k) {
+            if G.state != FINALFORM {
+                die(1)
+                set G.enemy_vel@k = 8
+            } else {
+                set G.hit_snake@k, G.enemy_vel@k = true, 8
+                kill(1, 100)
+                rl.play_sound(fx_snake)
+                hit_fx(k, s.x, s.y, 0, 0, f32(rl.random(0, 10) / 30), 100)
+            }
+        }
+        if recs(P, d) && (G.state != KICK) && !(G.hit_dingo@k) {
+            if G.state != FINALFORM {
+                die(2)
+                set G.enemy_vel@k = 8
+            } else {
+                set G.hit_dingo@k, G.enemy_vel@k = true, 8
+                kill(2, 100)
+                hit_fx(k, d.x, d.y, 0, 0, f32(rl.random(5, 10) / 30), 100)
+            }
+        }
+        if recs(P, o) && (G.state != KICK) && !(G.hit_owl@k) {
+            if G.state != FINALFORM {
+                die(3)
+                set G.enemy_vel@k = 8
+            } else {
+                set G.hit_owl@k, G.enemy_vel@k = true, 8
+                kill(3, 100)
+                hit_fx(k, o.x, o.y, o.x, o.y, f32(rl.random(5, 10) / 30), 100)
+            }
+        }
+        if G.hit_snake@k {
+            if (s.y + s.h) > H {
+                set G.snake_active@k, G.hit_snake@k = false, false
+            }
+            set s.x = f32(s.x + 2)
+            set G.enemy_vel@k = (G.enemy_vel@k) - 1
+            set s.y = f32(s.y - (G.enemy_vel@k))
+        }
+        if G.hit_dingo@k {
+            if d.y > H {
+                set G.dingo_active@k, G.hit_dingo@k = false, false
+            }
+            set d.x = f32(d.x + 2)
+            set G.enemy_vel@k = (G.enemy_vel@k) - 1
+            set d.y = f32(d.y - (G.enemy_vel@k))
+        }
+        if G.hit_owl@k {
+            if o.y > H {
+                set G.owl_active@k, G.hit_owl@k = false, false
+            }
+            set o.x = f32(o.x + 2)
+            set G.enemy_vel@k = (G.enemy_vel@k) - 1
+            set o.y = f32(o.y - (G.enemy_vel@k))
+        }
+    }
+}
+
+func leaves_step () {
+    val P = G.player
+    loop j in NL {
+        val l, lp = G.leaf@j, G.leaf_particles@j
+        set lp.x, lp.y = l.x, l.y
+        if l.x <= -l.w { set G.leaf_active@j = false }
+        if recs(P, l) && (G.leaf_active@j) {
+            val pl = G.popup_leaves@j
+            set pl.x, pl.y, pl.scale, pl.alpha, pl.active = l.x, l.y, 1, 1, true
+            rl.play_sound(fx_eat)
+            val t = G.leaf_type@j
+            if (t >= 0) && (t <= 3) {
+                set currentLeaves += t + 1
+                set pl.score = t + 1
+            }
+            set G.leaf_active@j = false
+            set lp.active = true
+            loop _,p in lp.ps {
+                set p.active = true
+                set p.x, p.y = lp.x, lp.y
+                set p.sx = f32(rl.random(-400, 400) / 100)
+                set p.sy = f32(rl.random(-400, 400) / 100)
+                set p.size = f32(rl.random(4, 8) / 10)
+                set p.rot = rl.random(-180, 180)
+                set p.alpha = 1
+            }
+        }
+    }
+    loop i in NL {
+        val lp = G.leaf_particles@i
+        if lp.active {
+            loop _,p in lp.ps {
+                set p.x = f32(p.x + p.sx)
+                set p.y = f32(p.y + p.sy)
+                set p.rot = f32(p.rot + 6)
+                set p.alpha = f32(p.alpha - f32(0.03))
+                set p.size = f32(p.size - 0.004)
+                if p.size <= 0 { set p.size = 0 }
+                if p.alpha <= 0 {
+                    set p.alpha, p.active, lp.active = 0, false, false
+                }
+            }
+        }
+        val pl = G.popup_leaves@i
+        if pl.active {
+            set pl.alpha = f32(pl.alpha - f32(0.02))
+            set pl.scale = f32(pl.scale + f32(0.1))
+            set pl.y = f32(pl.y - 3)
+            set pl.x = f32(pl.x - G.speed)
+            if pl.alpha <= 0 { set pl.active = false }
+        }
+    }
+    loop i in NE {
+        val h = G.enemy_hit@i
+        if h.active {
+            set h.alpha = f32(h.alpha - f32(0.1))
+            set h.size = f32(h.size + f32(0.1))
+            if h.alpha <= 0 { set h.active = false }
+        }
+        popup_step(G.popup_score@i)
+    }
+    popup_step(G.popup_bee)
+    popup_step(G.popup_eagle)
+}
+func popup_step (p) {
+    if p.active {
+        set p.alpha = f32(p.alpha - f32(0.02))
+        set p.scale = f32(p.scale + f32(0.2))
+        set p.y = f32(p.y - 4)
+        set p.x = f32(p.x - G.speed)
+        if p.alpha <= 0 { set p.active = false }
+    }
+}
+
+func spawn_one_g (s, p, lo, hi) {      ;; as spawn_one, with the counter of another system
+    if !p.active && (s.spawn >= s.max) {
+        set p.active = true
+        set p.x, p.y = rl.random(0, W + 200), -10
+        set s.spawn = 0
+        set s.max = rl.random(lo, hi)
+    }
+}
+
+func particles_spawn () {
+    if G.snow.active {
+        set G.snow.spawn += 1
+        loop _,p in G.snow.ps { spawn_one(G.snow, p, 5, 20) }
+    }
+    if G.back_snow.active {
+        set G.snow.spawn += 1             ;; (the C counts on the front snow)
+        loop _,p in G.back_snow.ps { spawn_one(G.back_snow, p, 3, 10) }
+    }
+    loop _,pair in [[G.planetree, G.back_planetree], [G.dandelion, G.dandelion_back], [G.flower, G.back_flower]] {
+        val f, b = pair@0, pair@1
+        if f.active {
+            set f.spawn += 1
+            set b.spawn += 1
+            loop i in 128 {
+                spawn_one(f, f.ps@i, 5, 20)
+                spawn_one(b, b.ps@i, 3, 10)
+            }
+        }
+    }
+    if G.rain.active {
+        set G.rain.spawn += 1
+        loop _,p in G.rain.ps { spawn_one(G.rain, p, 1, 8) }
+    }
+    if G.back_rain.active {
+        set G.back_rain.spawn += 1
+        loop _,p in G.back_rain.ps { spawn_one(G.back_rain, p, 1, 8) }
+    }
+    val rs = G.rain_storm
+    if rs.active {
+        set rs.spawn += 1
+        loop i in 512 {
+            if !(rs.ps@i).active && (rs.spawn >= rs.max) {
+                loop j in 16 {
+                    val p = rs.ps@(i + j)
+                    set p.active = true
+                    set p.x = rl.random(100, W + 1000)
+                    set p.y = rl.random(-10, -20)
+                }
+                set rs.spawn, rs.max = 0, 4
+            }
+        }
+    }
+    val ss = G.snow_storm
+    if ss.active {
+        set ss.spawn += 1
+        loop i in 512 {
+            val p = ss.ps@i
+            if !p.active && (ss.spawn >= ss.max) {
+                set p.active = true
+                set p.x, p.y = rl.random(100, W + 800), -10
+                set ss.spawn = 0
+                set ss.max = rl.random(1, 2)
+            }
+        }
+    }
+}
+
+func particles_step () {
+    val sf = G.speed_fx
+    if sf.active {
+        set sf.spawn += 1
+        loop _,p in sf.ps {
+            if !p.active && (sf.spawn >= sf.max) {
+                set p.active, p.alpha = true, f32(0.7)
+                set p.w = W
+                set p.h = rl.random(5, 30)
+                set p.x = W
+                set p.y = rl.random(0, H - 10)
+                set sf.spawn = 0
+                set sf.max = rl.random(1, 10)
+            }
+        }
+    }
+    loop _,p in sf.ps {
+        if p.active {
+            set p.x = f32(p.x - 40)
+            set p.alpha = f32(p.alpha - f32(0.015))
+            set p.h = f32(p.h - f32(0.1))
+            if p.h <= 0 { set p.active = false }
+        }
+    }
+    if G.rays.active {
+        set G.rays.spawn += 1
+        set G.back_rays.spawn += 1
+        loop i in 8 {
+            spawn_ray(G.rays, G.rays.ps@i, 10, 20)
+            spawn_ray(G.back_rays, G.back_rays.ps@i, 5, 15)
+        }
+    }
+    val sm = G.speed_mod
+    val m2, m3, m4, m5, m6, m8, m10, m12, m15, m25 = 2 * sm, f32(3 * sm), 4 * sm, f32(5 * sm), f32(6 * sm), 8 * sm, f32(10 * sm), f32(12 * sm), f32(15 * sm), f32(2.5 * sm)
+    fall(G.snow, 128, m2, m4, 0.5)
+    fall(G.back_snow, 128, sm, m5, 0.5)
+    fall(G.planetree, 128, m4, m5, 0.5)
+    fall(G.back_planetree, 128, m3, m5, 0.5)
+    loop i in 128 {
+        val d, b = G.dandelion.ps@i, G.dandelion_back.ps@i
+        if d.active {
+            set d.y = f32(d.y + m3)
+            set d.x = f32(d.x - m5)
+            set d.rot = f32(dandelion_rot(G.global, d.phy))
+            if d.y >= H { set d.active = false }
+        }
+        if b.active {
+            set b.y = f32(b.y + sm)
+            set b.x = f32(b.x - m5)
+            set b.rot = f32(-dandelion_rot(G.global, d.phy))
+            if b.y >= H { set b.active = false }
+        }
+    }
+    fall(G.flower, 128, m25, m4, 0.5)
+    fall(G.back_flower, 128, m25, m5, 0.5)
+    fall(G.rain, 128, m8, m10, nil)
+    fall(G.back_rain, 128, m6, m6, nil)
+    val rs = G.rain_storm
+    loop i in 512 {
+        val p = rs.ps@i
+        if p.active {
+            set p.y = f32(p.y + m12)
+            set p.x = f32(p.x - m15)
+            if p.y >= H { set p.active = false }
+            if !rs.active { set p.alpha = f32(p.alpha - 0.01) }
+        }
+    }
+    fall(G.snow_storm, 512, m12, m15, 0.5)
+    update_rays(G.rays, 0.5 * sm)
+    update_rays(G.back_rays, 0.5 * sm)
+}
+
+;; the koala, by its state
+func jump () {
+    set G.state, G.velocity, G.grab, G.jump_speed, G.right_alpha = JUMPING, 15, 0, 6, 1
+    set G.on_ice, G.on_resin = false, false
+}
+func kick_gravity () { if G.on_ice => 4 => 3 }
+func gesture_in (r) {
+    (rl.gesture_detected(rl.GESTURE_TAP) || (rl.gesture() == rl.GESTURE_DOUBLETAP)) &&
+        rl.check_collision_point_rec(rl.touch_x(0), rl.touch_y(0), r.x, r.y, r.w, r.h)
+}
+func click_in (r) {
+    rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), r.x, r.y, r.w, r.h) && rl.mouse_pressed(0)
+}
+func down_in (r) {
+    rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), r.x, r.y, r.w, r.h) && rl.mouse_down(0)
+}
+func hold_in (r) {
+    (rl.gesture_detected(rl.GESTURE_HOLD) || rl.gesture_detected(rl.GESTURE_DRAG)) &&
+        rl.check_collision_point_rec(rl.touch_x(0), rl.touch_y(0), r.x, r.y, r.w, r.h)
+}
+func kicked (k) {                       ;; an enemy hit by the kick
+    set G.state, G.velocity, G.enemy_vel@k, G.grab, G.gravity = JUMPING, 15, 8, 3, 3
+    set G.jump_speed = -3
+}
+
+func resin_jump () {
+    set G.resin_jump += 1
+    if G.resin_jump >= 2 {
+        jump()
+        set G.resin_jump, G.resin_drag, G.resin_count = 0, 0, 0
+    }
+}
+func resin_drag () {
+    set G.resin_drag += 1
+    if G.resin_drag >= 2 {
+        set G.gravity, G.state, G.grab, G.left_alpha, G.on_resin = 3, KICK, 0, 1, false
+        set G.resin_jump, G.resin_drag, G.resin_count = 0, 0, 0
+    }
+}
+
+func koala_step () {
+    val P = G.player
+    val st = G.state
+    if st == GRABED {
+        set G.on_wind = false
+        set G.wind_counter += 1
+        set G.resin_count += 1
+        set G.this_koala += 1
+        if G.this_koala >= 24 {
+            set G.cur_koala += 1
+            set G.this_koala = 0
+        }
+        if G.cur_koala > 2 { set G.cur_koala = 0 }
+        set G.koala_idle.x = ATLAS01.gameplay_koala_idle.x + (G.koala_idle.w * G.cur_koala)
+        if !G.on_resin {
+            if gesture_in(G.right_button) {
+                jump()
+                set G.this_koala = 0
+                rl.play_sound(fx_jump)
+            }
+            if gesture_in(G.left_button) {
+                set G.gravity = kick_gravity()
+                rl.play_sound(fx_dash)
+                set G.state, G.grab, G.left_alpha, G.on_resin = KICK, 0, 1, false
+            } else {
+                set G.gravity = if G.on_ice => 4 => 1
+            }
+            if rl.key_pressed('SPACE') || click_in(G.right_button) {
+                jump()
+                set G.this_koala = 0
+                rl.play_sound(fx_jump)
+            }
+            if rl.key_pressed('DOWN') || click_in(G.left_button) {
+                set G.gravity = kick_gravity()
+                rl.play_sound(fx_dash)
+                set G.state, G.grab, G.left_alpha, G.on_resin = KICK, 0, 1, false
+            } else {
+                set G.gravity = if G.on_ice => 4 => 1
+            }
+        } else {
+            if gesture_in(G.right_button) { resin_jump() }
+            if gesture_in(G.left_button) { resin_drag() } else { set G.gravity = 0 }
+            if rl.key_pressed('SPACE') || click_in(G.right_button) { resin_jump() }
+            if rl.key_pressed('DOWN') || click_in(G.left_button) { resin_drag() } else { set G.gravity = 0 }
+        }
+    } else {
+        if st == JUMPING {
+            set P.x = f32(P.x + G.jump_speed)
+            set G.velocity -= 1
+            set P.y = f32(P.y - G.velocity)
+            set G.frames += 1
+            set G.grab += 1
+        } else {
+            if st == KICK {
+                set G.gravity = f32(G.gravity + 1)
+                set P.y = f32(P.y + G.gravity)
+                set P.x = f32(P.x - G.speed)
+                set G.grab += 1
+                loop i in NE {
+                    val s, d, o = G.snake@i, G.dingo@i, G.owl@i
+                    if recs(P, s) && !(G.hit_snake@i) && (G.snake_active@i) {
+                        kicked(i)
+                        set G.hit_snake@i = true
+                        kill(1, 100)
+                        rl.play_sound(fx_snake)
+                        hit_fx(i, s.x, s.y, s.x, s.y, f32(rl.random(5, 10) / 30), 100)
+                    }
+                    if recs(P, d) && !(G.hit_dingo@i) && (G.dingo_active@i) {
+                        kicked(i)
+                        set G.hit_dingo@i = true
+                        kill(2, 100)
+                        rl.play_sound(fx_dingo)
+                        hit_fx(i, d.x, d.y, d.x, d.y, f32(rl.random(5, 10) / 30), 100)
+                    }
+                    if recs(P, o) && !(G.hit_owl@i) && (G.owl_active@i) {
+                        kicked(i)
+                        set G.hit_owl@i = true
+                        kill(3, 100)
+                        rl.play_sound(fx_owl)
+                        hit_fx(i, o.x, o.y, o.x, o.y, f32(rl.random(5, 10) / 30), 100)
+                    }
+                }
+                if recs(P, G.bee) && !G.hit_bee && G.bee_active {
+                    set G.state, G.velocity, G.bee_velocity, G.grab, G.gravity = JUMPING, 15, 8, 3, 3
+                    set G.hit_bee, G.jump_speed = true, -3
+                    kill(4, 300)
+                    popup_at(G.popup_bee, G.bee.x, G.bee.y, 300)
+                }
+                if recs(P, G.eagle) && !G.hit_eagle && G.eagle_active {
+                    set G.state, G.velocity, G.bee_velocity, G.grab, G.gravity = JUMPING, 15, 8, 3, 3
+                    set G.hit_eagle, G.jump_speed = true, -3
+                    kill(5, 300)
+                    popup_at(G.popup_eagle, G.eagle.x, G.eagle.y, 300)
+                }
+            } else {
+                if st == FINALFORM {
+                    if G.transforming {
+                        set G.speed_mod = 0
+                        set G.trans_count += 1
+                        set G.trans_rotation = f32(G.trans_rotation + 1)
+                        set G.trans_ani += 1
+                        set G.this_koala += 1
+                        set currentLeaves = int(ease(G.trans_count, G.init_leaves, -100, 120))
+                        if G.this_koala >= 24 {
+                            set G.cur_koala += 1
+                            set G.this_koala = 0
+                        }
+                        if G.cur_koala <= 1 {
+                            set G.koala_transform.x = ATLAS01.gameplay_koala_transform.x + (G.koala_transform.w * G.cur_koala)
+                        }
+                        if G.trans_ani >= 5 {
+                            set G.trans_back = !G.trans_back
+                            set G.trans_ani = 0
+                        }
+                        if G.trans_back {
+                            set G.final_color, G.final_color2 = rl.RED, rl.WHITE
+                        } else {
+                            set G.final_color, G.final_color2 = rl.WHITE, rl.RED
+                        }
+                        if G.trans_count >= 120 {
+                            set G.transforming, G.this_koala, G.cur_koala = false, 0, 0
+                            set G.speed_fx.active, G.trans_count = true, 0
+                            set G.bamboo_timer += 15
+                        }
+                    } else {
+                        set G.speed_mod = 5
+                        set G.scroll_speed = f32(3.2)
+                        set G.power -= 1
+                        set G.this_koala += 1
+                        if G.this_koala >= 12 {
+                            set G.cur_koala += 1
+                            set G.this_koala = 0
+                        }
+                        if G.cur_koala > 1 { set G.cur_koala = 0 }
+                        if G.cur_koala <= 1 {
+                            set G.koala_fly.x = ATLAS01.gameplay_koala_fly.x + (G.koala_fly.w * G.cur_koala)
+                        }
+                        if P.x > (W // 3) { set P.x = f32(P.x - 2) }
+                        if P.x < (W // 3) { set P.x = f32(P.x + 1) }
+                        if G.power <= (G.max_power // 5) {
+                            set G.final_end += 1
+                            if G.final_end >= 5 {
+                                set G.trans_back = !G.trans_back
+                                set G.final_end = 0
+                            }
+                            set G.final_color = if G.trans_back => rl.RED => rl.WHITE
+                        } else {
+                            set G.final_color = rl.WHITE
+                        }
+                        if hold_in(G.left_button) { set P.y = f32(P.y + 10) }
+                        if hold_in(G.right_button) { set P.y = f32(P.y - 10) }
+                        if rl.key_down('DOWN') || down_in(G.left_button) { set P.y = f32(P.y + 10) }
+                        if rl.key_down('UP') || down_in(G.right_button) { set P.y = f32(P.y - 10) }
+                    }
+                    set G.gravity = 0
+                    set G.grab += 1
+                } else {
+                    if st == ONWIND {
+                        set P.x = f32(P.x - G.jump_speed)
+                        set G.velocity -= 2
+                        set P.y = f32(P.y - G.velocity)
+                        set G.frames += 1
+                        set G.grab += 1
+                    }
+                }
+            }
+        }
+    }
+    if P.x <= -P.w {
+        set G.play, G.player_active = false, false
+        set killer = 4
+    }
+    if (P.y + P.h) >= H {
+        if G.state == FINALFORM {
+            set P.y = H - P.h
+        } else {
+            set G.play, G.player_active = false, false
+            set killer = 4
+        }
+    }
+    if (P.y <= 0) && (G.state == FINALFORM) { set P.y = 0 }
+    if P.x >= (W - P.w) { set P.x = W - P.w }
+    if P.y <= -32 { set P.y = -32 }
+}
+
+;; the spawns, when a tree comes
+func first_free (actives, n) {
+    var k = nil
+    loop i in n { if (k == nil) && !(actives@i) { set k = i } }
+    k
+}
+func bamboo_spawn () {
+    val k = first_free(G.bamboo_active, NE)
+    if k != nil {
+        set (G.bamboo@k).y, (G.bamboo@k).x = 0, W
+        set G.bamboo_active@k = true
+    }
+}
+func snake_spawn (chance) {
+    set G.pos@0, G.pos@1 = -1, -1
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.snake_active, NE)
+        if k != nil {
+            val p = rl.random(0, 4)
+            set G.pos@0 = p
+            set (G.snake@k).x, (G.snake@k).y = W - 15, row(p)
+            set G.snake_active@k, G.hit_snake@k = true, false
+        }
+    }
+}
+func dingo_spawn (chance) {
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.dingo_active, NE)
+        if k != nil {
+            val p = rl.random(1, 3)
+            set G.pos@0 = p
+            set (G.dingo@k).x, (G.dingo@k).y = W - 15, row(p)
+            set G.dingo_active@k, G.hit_dingo@k = true, false
+        }
+    }
+}
+func owl_spawn (chance) {
+    set G.pos@0, G.pos@1 = -1, -1
+    if rl.random(0, 100) <= chance {
+        var k = nil
+        loop i in NE {
+            if (k == nil) && !(G.owl_active@i) && !(G.branch_active@i) { set k = i }
+        }
+        if k != nil {
+            val p = rl.random(1, 3)
+            set G.pos@0 = p
+            val o = G.owl@k
+            set o.x, o.y = W - 15, row(p)
+            set G.owl_active@k = true
+            set (G.branch@k).x, (G.branch@k).y = o.x, o.y + 64
+            set G.branch_active@k = true
+        }
+    }
+}
+func leaf_spawn () {
+    var counter = 0
+    val max = rl.random(0, 2)
+    set G.pos_leaf@0, G.pos_leaf@1 = -1, -1
+    loop k in NL {
+        if !(G.leaf_active@k) && (counter <= max) {
+            var lp = rl.random(0, 4)
+            val sel = rl.random(0, 99)
+            val side = rl.random(0, 1)
+            set G.leaf_side@k = side == 1
+            val pl = G.pos_leaf
+            if counter == 0 {
+                loop {
+                    until !check_pos(lp)
+                    set lp = rl.random(0, 4)
+                }
+            } else {
+                if counter == 1 {
+                    loop {
+                        until !((lp == pl@0) || check_pos(lp))
+                        set lp = rl.random(0, 4)
+                    }
+                } else {
+                    loop {
+                        until !(((lp == pl@1) || (lp == pl@0)) || check_pos(lp))
+                        set lp = rl.random(0, 4)
+                    }
+                }
+            }
+            set pl@counter = lp
+            set (G.leaf@k).y = 30 + ((H // 5) * lp)
+            set (G.leaf@k).x = W - 18
+            set G.leaf_active@k = true
+            set G.leaf_type@k = if sel <= 24 => 0 => if sel <= 50 => 1 => if sel <= 75 => 2 => 3
+            set counter += 1
+        }
+    }
+}
+func fire_spawn (chance) {
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.fire_active, NF)
+        if k != nil {
+            set (G.fire@k).y, (G.fire@k).x = H - 30, W - 5
+            set G.fire_active@k, G.on_fire@k = true, false
+        }
+    }
+}
+func ice_spawn (chance) {
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.ice_active, NI)
+        if k != nil {
+            set (G.ice@k).y, (G.ice@k).x = 0, W + 5
+            set G.ice_active@k = true
+        }
+    }
+}
+func row_free () {                      ;; a row where no enemy came
+    var p = rl.random(0, 4)
+    loop {
+        until !check_pos(p)
+        set p = rl.random(0, 4)
+    }
+    p
+}
+func resin_spawn (chance) {
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.resin_active, NR)
+        if k != nil {
+            set (G.resin@k).y = row(row_free())
+            set (G.resin@k).x = W + 5
+            set G.resin_active@k = true
+        }
+    }
+}
+func wind_spawn (chance) {
+    if rl.random(0, 100) <= chance {
+        val k = first_free(G.wind_active, NW)
+        if k != nil {
+            set (G.wind@k).y = row(row_free())
+            set (G.wind@k).x = W + 5
+            set G.wind_active@k = true
+        }
+    }
+}
+func bee_spawn (chance) {
+    if (rl.random(0, 100) <= chance) && !G.bee_active && !G.alert_bee_active {
+        set G.bee.x = W
+        set G.bee.y = rl.random(40, H - G.bee.h - 40)
+        set G.bee_alert = rect(W, G.bee.y + (ATLAS01.gameplay_enemy_bee.h / 2), 0, 0)
+        set G.bee_active, G.alert_bee_active = false, true
+    }
+}
+func eagle_spawn (chance) {
+    if (rl.random(0, 100) <= chance) && !G.eagle_active && !G.alert_active {
+        set G.eagle_delay = 0
+        set G.eagle.x, G.eagle.y = W, G.player.y
+        set G.alert = rect(W, f32(G.eagle.y + (ATLAS01.gameplay_enemy_eagle.h / 2)), 0, 0)
+        set G.eagle_active, G.eagle_alert, G.alert_active = false, true, true
+    }
+}
+
+func spawns_step () {
+    if G.bamboo_timer > G.bamboo_spawn {
+        if !G.transforming {
+            bamboo_spawn()
+            if (G.state != FINALFORM) && (G.eagle_delay >= 600) { eagle_spawn(5) }
+            val pc = int(G.progresion_chance)
+            if G.season == WINTER {
+                ice_spawn(30)
+                owl_spawn(30 + pc)
+            } else {
+                if G.season == SPRING {
+                    resin_spawn(30)
+                    if G.state != FINALFORM { bee_spawn(10) }
+                    dingo_spawn(30 + pc)
+                } else {
+                    if G.season == SUMMER {
+                        fire_spawn(30)
+                        snake_spawn(30 + pc)
+                    } else {
+                        if G.season == FALL {
+                            wind_spawn(30)
+                            snake_spawn(30 + pc)
+                        }
+                    }
+                }
+            }
+            leaf_spawn()
+        }
+        set G.bamboo_timer = 0
+        set G.bamboo_spawn = rl.random(35, 85)
+    }
+}
+
+;; One frame of play (the C's `if (play && playerActive)`)
+func play_step () {
+    val sm0 = G.speed_mod
+    set G.season_timer = int(G.season_timer + sm0)
+    set G.month_timer = int(G.month_timer + sm0)
+    set G.eagle_delay = int(G.eagle_delay + sm0)
+    set G.global += 1
+    if G.month_timer >= G.month_change {
+        loop _,ca in CLOCK_AT {
+            if G.month == ca@0 {
+                set G.clock_init = ca@1
+                set G.clock_final = G.clock_init + 90
+                set rainChance = rl.random(0, 100)
+                set G.clock_speed = 0
+                set seasons += 1
+            }
+        }
+        set G.month += 1
+        set G.month_timer = 0
+    }
+    if G.month > 11 {
+        set G.month = 0
+        set years += 1
+    }
+    seasons_step()
+    if !G.transforming {
+        set G.scroll_front = f32(G.scroll_front - G.scroll_speed)
+        set G.scroll_middle = f32(G.scroll_middle - f32(G.scroll_speed * f32(0.75)))
+        set G.scroll_back = f32(G.scroll_back - (G.scroll_speed / 2))
+        set G.fog_position -= G.fog_speed
+        set G.ground = f32(G.ground - G.speed)
+        set G.clock = f32(G.clock + G.clock_speed)
+    }
+    val P = G.player
+    set P.y = f32(P.y + G.gravity)
+    set G.bamboo_timer = int(G.bamboo_timer + G.speed_mod)
+    set G.speed = int(3.0 * G.speed_mod)
+    if (P.x >= (W * 0.6)) && (G.state != FINALFORM) {
+        set G.speed_increase = f32(f32(P.x - f32(W * f32(0.6))) / W)
+    } else {
+        if (P.x < (W * 0.6)) && (G.state != FINALFORM) { set G.speed_increase = 0 }
+    }
+    if G.state != FINALFORM {
+        set G.speed_mod = f32((1.2 + G.speed_increase) + G.speed_progresion)
+    }
+    set G.progresion_delay += 1
+    if G.progresion_delay >= 3600 {
+        set G.progresion_frames += 1
+        if G.progresion_frames < 12000 {
+            set G.speed_progresion = ease(G.progresion_frames, 0, f32(0.5), 12000)
+            set G.progresion_chance = ease(G.progresion_frames, 0, 30, 12000)
+        }
+    }
+    if G.scroll_front <= -W { set G.scroll_front = 0 }
+    if G.scroll_middle <= -W { set G.scroll_middle = 0 }
+    if G.scroll_back <= -W { set G.scroll_back = 0 }
+    if G.ground <= -W { set G.ground = 0 }
+    if G.fog_position <= -W { set G.fog_position = 0 }
+    if (G.fog_alpha > 0) && !G.fog {
+        set G.fog_alpha = f32(G.fog_alpha - f32(f32(0.03) * G.speed_mod))
+    } else {
+        if G.fog && (G.fog_alpha < 1) { set G.fog_alpha = f32(G.fog_alpha + f32(f32(0.03) * G.speed_mod)) }
+    }
+    if (G.filter_alpha > 0) && !G.fog {
+        set G.filter_alpha = f32(G.filter_alpha - f32(f32(0.02) * G.speed_mod))
+    } else {
+        if G.fog && (G.filter_alpha < f32(0.15)) { set G.filter_alpha = f32(G.filter_alpha + f32(f32(0.02) * G.speed_mod)) }
+    }
+    set G.clock_speed = f32(G.clock_speed + G.speed_mod)
+    if G.clock_speed <= SEASONCHANGE {
+        set G.clock = ease(G.clock_speed, G.clock_init, 90, SEASONCHANGE)
+    } else {
+        set G.clock = G.clock_final
+    }
+    if rl.check_collision_circle_rec(G.clock_x, G.clock_y, ATLAS01.gameplay_gui_seasonsclock_disc.w, P.x, P.y, P.w, P.h) {
+        if G.ui_fade > f32(0.4) { set G.ui_fade = f32(G.ui_fade - f32(0.01)) }
+    } else {
+        if G.ui_fade < 1 { set G.ui_fade = f32(G.ui_fade + f32(0.01)) }
+    }
+    animations_step()
+    if !G.transforming { flyers_step() }
+    power_step()
+    props_step()
+    bamboo_step()
+    enemies_step()
+    leaves_step()
+    if G.state != FINALFORM { particles_spawn() }
+    particles_step()
+    koala_step()
+    spawns_step()
+}
+
+;; The fall of the koala, dead (the C's `else if (!play && !playerActive)`)
+func fall_step () {
+    if score > hiscore { set hiscore = score }
+    val P = G.player
+    set P.x = f32(P.x - G.jump_speed)
+    set G.velocity -= 1
+    set P.y = f32(P.y - G.velocity)
+    if P.y >= H { set G.finish = 1 }
+}
+
+;; A game: the countdown, the play, the fall; then the ending.
+task Gameplay () {
+    spawn {
+        loop on :rl.draw { gameplay_draw() }
+    }
+    loop on :rl.frame {
+        countdown_step()
+        if G.play { play_step() }
+        until G.play || !G.player_active
+    }
+    if G.player_active {
+        loop on :rl.frame {
+            play_step()
+            until !G.player_active
+        }
+    }
+    loop on :rl.frame {
+        fall_step()
+        until G.finish == 1
+    }
+    set pub = :ending
+    await false
+}
+
+;; ---------------------------------------------------------------------------
+;; The drawing
+
+func tex_rec (atlas, r, x, y, c) {
+    rl.draw_texture_rec(atlas, r.x, r.y, r.w, r.h, x, y, c)
+}
+val COUNTDOWN = [nil, ATLAS01.gameplay_countdown_1, ATLAS01.gameplay_countdown_2, ATLAS01.gameplay_countdown_3]
+val INIT_FADE = [0xD8C827FF, 0x9B4616FF, 0x1181A2FF, 0x52AE07FF]
+val MESSAGES = [                        ;; month: texts and color
+    [7, "FLOWER POWER!", "POLLEN IS IN THE AIR", 0xB9DE69FF],
+    [10, "PREPARE FOR THE SUMMER!", "HAPPY NEW YEAR!", 0xFDC86CFF],
+    [1, "HERE COMES THE FALL!", "IT'S RAINING RAIN", 0xFF956BFF],
+    [4, "WINTER IS COMING!", "LET IT SNOW!", 0x85F9FDFF],
+]
+
+func gameplay_draw () {
+    val P = G.player
+    rl.begin_shader_mode(blend)
+    val bg = ATLAS02.gameplay_background
+    draw_rect(atlas2, bg, 0, 0, bg.w * 2, bg.h * 2, G.c2)
+    parallax_back(G.back_offset, G.scroll_back, G.c1, G.c2, true)
+    parallax_middle(G.scroll_middle, G.c1, G.c2, true)
+    loop i in 128 {
+        val p1, p2, p3, p4, p5 = G.back_snow.ps@i, G.back_planetree.ps@i, G.dandelion_back.ps@i, G.back_flower.ps@i, G.back_rain.ps@i
+        if p1.active { draw_particle(atlas2, ATLAS02.particle_icecrystal_bw, p1, 0x90D6FFFF) }
+        if p2.active { draw_particle(atlas2, ATLAS02.particle_planetreeleaf_bw, p2, 0xB35606FF) }
+        if p3.active { draw_particle(atlas2, ATLAS02.particle_dandelion_bw, p3, 0xCAA77EFF) }
+        if p4.active { draw_particle(atlas2, ATLAS02.particle_ecualyptusflower_bw, p4, 0xDA546CFF) }
+        if p5.active { draw_particle(atlas2, ATLAS02.particle_waterdrop_bw, p5, 0x90B7BBFF) }
+    }
+    loop _,r in G.back_rays.ps {
+        if r.active { draw_particle(atlas2, ATLAS02.gameplay_back_fx_lightraymid, r, r.color) }
+    }
+    parallax_front(G.front_offset, G.scroll_front, G.c1, G.c2, true)
+    loop i in NB {
+        if G.bamboo_active@i {
+            draw_rect(atlas2, ATLAS02.gameplay_props_tree, (G.bamboo@i).x, (G.bamboo@i).y, 43, 720, G.c3)
+        }
+    }
+    loop i in NE {
+        if G.branch_active@i {
+            draw_rect(atlas2, ATLAS02.gameplay_props_owl_branch, (G.branch@i).x, (G.branch@i).y, 36, 20, G.c3)
+        }
+    }
+    rl.end_shader_mode()
+    val bt, fa, fs = ATLAS01.gameplay_props_burnttree, G.fire_anim, ATLAS01.gameplay_props_fire_spritesheet
+    loop i in NF {
+        val f = G.fire@i
+        rl.draw_texture_pro(atlas1, bt.x, f32(f32(bt.y + f.y) + (bt.h / 14)), bt.w, bt.h, f32(f.x + 5), f32(f.y + (bt.h / 14)), bt.w, bt.h, 0, 0, 0, rl.WHITE)
+        tex_rec(atlas1, fa, f.x, H - (bt.h / 7), rl.WHITE)
+        loop jj in 23 {
+            val j = 20 - jj                 ;; from MAX_FIRE_FLAMES down to -1
+            if (f32(f.y - 25) <= (j * 43)) && (G.fire_active@i) {
+                if math.fmod(j, 2) > 0 {
+                    tex_rec(atlas1, fa, f32(f32(f.x + G.fire_offset) - 10), 40 * j, rl.WHITE)
+                    set fa.x = fs.x + (fa.w * G.cur1)
+                } else {
+                    if (math.fmod(j, 2) + 1) == 1 {
+                        tex_rec(atlas1, fa, f32(f.x - G.fire_offset), 40 * j, rl.WHITE)
+                        set fa.x = fs.x + (fa.w * G.cur2)
+                    } else {
+                        tex_rec(atlas1, fa, f32(f.x - G.fire_offset), 40 * j, rl.WHITE)
+                        set fa.x = fs.x + (fa.w * G.cur3)
+                    }
+                }
+            }
+        }
+    }
+    val is = ATLAS01.gameplay_props_ice_sprite
+    loop i in NI {
+        if G.ice_active@i {
+            loop k in 6 {
+                rl.draw_texture_pro(atlas1, is.x, is.y, is.w, is.h, f32((G.ice@i).x - 5), f32((G.ice@i).y + (k * 120)), is.w, is.h, 0, 0, 0, rl.WHITE)
+            }
+        }
+    }
+    rl.begin_shader_mode(blend)
+    val g0 = ATLAS02.gameplay_back_ground00
+    draw_rect(atlas2, g0, int(G.ground) + W, 637, g0.w * 2, g0.h * 2, G.c0)
+    draw_rect(atlas2, g0, int(G.ground), 637, g0.w * 2, g0.h * 2, G.c0)
+    rl.end_shader_mode()
+    loop i in NR {
+        if G.resin_active@i {
+            val r = G.resin@i
+            tex_rec(atlas1, ATLAS01.gameplay_props_resin_sprite, f32(r.x - f32(r.w / 3)), f32(r.y - f32(r.h / 5)), rl.WHITE)
+        }
+    }
+    val es, ed, eo = ATLAS01.gameplay_enemy_snake, ATLAS01.gameplay_enemy_dingo, ATLAS01.gameplay_enemy_owl
+    loop i in NE {
+        val s, d, o = G.snake@i, G.dingo@i, G.owl@i
+        if G.snake_active@i {
+            if !(G.hit_snake@i) {
+                tex_rec(atlas1, G.snake_anim, f32(s.x - s.w), f32(s.y - (s.h / 2)), rl.WHITE)
+            } else {
+                rl.draw_texture_rec(atlas1, es.x + (G.snake_anim.w * 2), es.y, G.snake_anim.w, G.snake_anim.h, f32(s.x - (s.w / 2)), f32(s.y - (s.h / 2)), rl.WHITE)
+            }
+        }
+        if G.dingo_active@i {
+            if !(G.hit_dingo@i) {
+                tex_rec(atlas1, G.dingo_anim, f32(d.x - (d.w / 2)), f32(d.y - (d.h / 4)), rl.WHITE)
+            } else {
+                rl.draw_texture_rec(atlas1, ed.x + (G.dingo_anim.w * 2), ed.y, G.dingo_anim.w, G.dingo_anim.h, f32(d.x - (d.w / 2)), f32(d.y - (d.h / 4)), rl.WHITE)
+            }
+        }
+        if G.owl_active@i {
+            if !(G.hit_owl@i) {
+                tex_rec(atlas1, G.owl_anim, o.x - (o.w * 0.7), o.y - (o.h * 0.1), rl.WHITE)
+            } else {
+                rl.draw_texture_rec(atlas1, eo.x + (G.owl_anim.w * 2), eo.y, G.owl_anim.w, G.owl_anim.h, f32(o.x - (o.w / 2)), f32(o.y - f32(o.h / 6)), rl.WHITE)
+            }
+        }
+        val h = G.enemy_hit@i
+        if h.active { draw_particle(atlas1, ATLAS01.particle_hit, h, h.color) }
+    }
+    val LEAF_RECS = [ATLAS01.gameplay_props_leaf_lil, ATLAS01.gameplay_props_leaf_lil, ATLAS01.gameplay_props_leaf_mid, ATLAS01.gameplay_props_leaf_big]
+    val el = ATLAS01.particle_ecualyptusleaf
+    loop i in NL {
+        if G.leaf_active@i {
+            val l, t = G.leaf@i, G.leaf_type@i
+            val r = LEAF_RECS@t
+            if r {
+                val dy = if t == 1 => 10 => -15
+                if G.leaf_side@i {
+                    rl.draw_texture_rec(atlas1, r.x, r.y, -r.w, r.h, l.x, f32(l.y + dy), rl.WHITE)
+                } else {
+                    tex_rec(atlas1, r, f32(l.x - 25), f32(l.y + dy), rl.WHITE)
+                }
+            }
+        }
+        val lp = G.leaf_particles@i
+        if lp.active {
+            loop _,p in lp.ps {
+                rl.draw_texture_pro(atlas1, el.x, el.y, el.w, el.h, p.x, p.y, el.w * p.size, el.h * p.size,
+                    (el.w / 2) * p.size, (el.h / 2) * p.size, p.rot, rl.fade(rl.WHITE, p.alpha))
+            }
+        }
+    }
+    val eb = ATLAS01.gameplay_enemy_bee
+    if G.bee_active && !G.hit_bee {
+        tex_rec(atlas1, G.bee_anim, G.bee.x, f32(G.bee.y - (eb.h / 2)), rl.WHITE)
+    } else {
+        if G.bee_active && G.hit_bee {
+            rl.draw_texture_pro(atlas1, eb.x + (G.bee_anim.w * 4), eb.y, G.bee_anim.w, eb.h, G.bee.x, G.bee.y, G.bee_anim.w, eb.h, 0, 0, 0, rl.WHITE)
+        }
+    }
+    if G.eagle_active && !G.hit_eagle {
+        tex_rec(atlas1, G.eagle_anim, G.eagle.x, G.eagle.y, rl.WHITE)
+    } else {
+        if G.eagle_active && G.hit_eagle {
+            tex_rec(atlas1, ATLAS01.gameplay_enemy_eagle_death, G.eagle.x, G.eagle.y, rl.WHITE)
+        }
+    }
+    val ea = ATLAS01.gameplay_fx_eaglealert
+    if G.alert_active {
+        rl.draw_texture_pro(atlas1, ea.x, ea.y, ea.w, ea.h, G.alert.x, G.alert.y, G.alert.w, G.alert.h, 0, 0, 0, rl.fade(rl.RED, 0.7))
+    }
+    if G.alert_bee_active {
+        rl.draw_texture_pro(atlas1, ea.x, ea.y, ea.w, ea.h, G.bee_alert.x, G.bee_alert.y, G.bee_alert.w, G.bee_alert.h, 0, 0, 0, rl.fade(rl.ORANGE, 0.7))
+    }
+    if G.transforming {
+        val bt2 = ATLAS02.background_transformation
+        val cx, cy = f32(P.x + (P.w / 2)), f32(P.y + (P.h / 2))
+        loop i in 8 {
+            rl.draw_texture_pro(atlas2, bt2.x, bt2.y, bt2.w, bt2.h, cx, cy, bt2.w * 4, bt2.h * 4, 0, bt2.h * 2, 45 * i, rl.fade(G.final_color, 0.7))
+        }
+        loop i in 8 {
+            rl.draw_texture_pro(atlas2, bt2.x, bt2.y, bt2.w, bt2.h, cx, cy, bt2.w * 4, bt2.h, 0, bt2.h / 2, 22.5 + (45 * i), rl.fade(G.final_color2, 0.7))
+        }
+    }
+    val kj, kd, kt, kf, ki = ATLAS01.gameplay_koala_jump, ATLAS01.gameplay_koala_dash, ATLAS01.gameplay_koala_transform, ATLAS01.gameplay_koala_fly, ATLAS01.gameplay_koala_idle
+    if G.player_active && G.play {
+        val st = G.state
+        if st == GRABED {
+            tex_rec(atlas1, G.koala_idle, f32(P.x - P.w), f32(P.y - (ki.h / 4)), rl.WHITE)
+        }
+        if (st == JUMPING) || (st == ONWIND) {
+            rl.draw_texture_pro(atlas1, kj.x, kj.y, kj.w, kj.h, f32(P.x - P.w), f32(P.y - (kj.h / 4)), kj.w, kj.h, 0, 0, 0, rl.WHITE)
+        }
+        if st == KICK {
+            rl.draw_texture_pro(atlas1, kd.x, kd.y, kd.w, kd.h, f32(P.x - P.w), f32(P.y - (kj.h / 4)), kd.w, kd.h, 0, 0, 0, rl.WHITE)
+        }
+        if st == FINALFORM {
+            if G.transforming {
+                val r = G.koala_transform
+                rl.draw_texture_pro(atlas1, r.x, r.y, r.w, r.h, f32(P.x - P.w), f32(P.y - (kt.h / 4)), kt.w / 2, kt.h, 0, 0, 0, G.final_color)
+            } else {
+                val r = G.koala_fly
+                rl.draw_texture_pro(atlas1, r.x, r.y, r.w, r.h, f32(P.x - f32(kf.w / 3)), f32(P.y - (kf.h / 4)), kf.w / 2, kf.h, 0, 0, 0, G.final_color)
+            }
+        }
+    } else {
+        if !G.play && G.player_active {
+            rl.draw_texture_rec(atlas1, ki.x, ki.y, ki.w / 3, ki.h, f32(P.x - P.w), f32(P.y - (ki.h / 4)), rl.WHITE)
+        } else {
+            val kdie = ATLAS01.gameplay_koala_die
+            rl.draw_texture_pro(atlas1, kdie.x, kdie.y, kdie.w, kdie.h, f32(P.x - P.w), f32(P.y - (kdie.h / 4)), kdie.w, kdie.h, 0, 0, 0, rl.WHITE)
+        }
+    }
+    loop i in NW {
+        if G.wind_active@i {
+            tex_rec(atlas1, G.wind_anim, f32((G.wind@i).x - 14), f32((G.wind@i).y - 14), rl.WHITE)
+        }
+    }
+    if G.player_active && !G.play {
+        rl.rectangle(0, 0, W, H, rl.fade(INIT_FADE@initSeason, 0.4))
+    }
+    loop i in 128 {
+        val p1, p2, p3, p4, p5 = G.snow.ps@i, G.planetree.ps@i, G.dandelion.ps@i, G.flower.ps@i, G.rain.ps@i
+        if p1.active { draw_particle(atlas1, ATLAS01.particle_icecrystal, p1, p1.color) }
+        if p2.active { draw_particle(atlas1, ATLAS01.particle_planetreeleaf, p2, p2.color) }
+        if p3.active { draw_particle(atlas1, ATLAS01.particle_dandelion, p3, p3.color) }
+        if p4.active { draw_particle(atlas1, ATLAS01.particle_ecualyptusflower, p4, p4.color) }
+        if p5.active { draw_particle(atlas1, ATLAS01.particle_waterdrop, p5, p5.color) }
+    }
+    loop _,p in G.speed_fx.ps {
+        if p.active { rl.rectangle(p.x, p.y, p.w, p.h, rl.fade(rl.WHITE, p.alpha)) }
+    }
+    loop i in 512 {
+        val p = G.rain_storm.ps@i
+        if p.active { draw_particle(atlas1, ATLAS01.particle_waterdrop, p, p.color) }
+    }
+    loop i in 512 {
+        val p = G.snow_storm.ps@i
+        if p.active { draw_particle(atlas1, ATLAS01.particle_icecrystal, p, p.color) }
+    }
+    loop _,r in G.rays.ps {
+        if r.active { draw_particle(atlas1, ATLAS01.gameplay_fx_lightraymid, r, r.color) }
+    }
+    val fog = ATLAS02.background_fog02
+    if G.fog_alpha != 0 {
+        rl.draw_texture_pro(atlas2, fog.x, fog.y, fog.w, fog.h, G.fog_position, H * 0.6, W, fog.h, 0, 0, 0, rl.fade(rl.WHITE, G.fog_alpha))
+        rl.draw_texture_pro(atlas2, fog.x, fog.y, fog.w, fog.h, G.fog_position + W, H * 0.6, W, fog.h, 0, 0, 0, rl.fade(rl.WHITE, G.fog_alpha))
+    }
+    if (G.filter_alpha != 0) && (G.state != FINALFORM) {
+        rl.rectangle(0, 0, W, H, rl.fade(rl.SKYBLUE, G.filter_alpha))
+    }
+    val lb, sd, sb = ATLAS01.gameplay_gui_leafcounter_base, ATLAS01.gameplay_gui_seasonsclock_disc, ATLAS01.gameplay_gui_seasonsclock_base
+    draw_rect(atlas1, lb, 0, 0, lb.w, lb.h, rl.WHITE)
+    rl.draw_texture_pro(atlas1, sd.x, sd.y, sd.w, sd.h, W, 0, sd.w, sd.h, sd.w / 2, sd.h / 2, G.clock, rl.fade(rl.WHITE, G.ui_fade))
+    draw_rect(atlas1, sb, W - sb.w, 0, sb.w, sb.h, rl.fade(rl.WHITE, G.ui_fade))
+    val cell = ATLAS01.gameplay_gui_leafcounter_cell
+    loop i in 20 {
+        if (((currentLeaves // 5) > i) && (G.state != FINALFORM)) || (((G.power // 18) >= i) && (G.state == FINALFORM)) {
+            rl.draw_texture_pro(atlas1, cell.x, cell.y, cell.w, cell.h, 87, 83, cell.w, cell.h, cell.w / 4, 69, i * -18, rl.WHITE)
+        }
+    }
+    if (currentLeaves >= 100) && (G.state != FINALFORM) {
+        val pu, gl = ATLAS01.gameplay_gui_leafcounter_pulsel, ATLAS01.gameplay_gui_leafcounter_glow
+        val sc = G.pulse_scale
+        rl.draw_texture_pro(atlas1, pu.x, pu.y, pu.w, pu.h, 85, 84, pu.w * sc, pu.h * sc, (pu.w * sc) / 2, (pu.h * sc) / 2, 0, rl.fade(0x7EF819FF, G.pulse_fade))
+        rl.draw_texture_pro(atlas1, gl.x, gl.y, gl.w, gl.h, 84, 83, gl.w, gl.h, gl.w / 2, gl.h / 2, 0, rl.fade(rl.WHITE, G.glow_fade))
+    }
+    if !G.play && G.player_active {
+        val cd = COUNTDOWN@(G.start_num)
+        if cd {
+            val ns = G.number_scale
+            val alpha = if G.start_num == 3 => G.number_alpha => G.pulse_fade
+            rl.draw_texture_pro(atlas1, cd.x, cd.y, cd.w, cd.h, W // 2, H // 2, cd.w * ns, cd.h * ns, (cd.w * ns) / 2, (cd.h * ns) / 2, 0, rl.fade(rl.RED, alpha))
+        }
+    }
+    loop _,p in G.popup_score {
+        if p.active {
+            rl.text_ex(font, string.format("%d", p.score), p.x, p.y, f32(f32(SIZE / 4) * p.scale), -5, rl.fade(0xFF4949FF, p.alpha))
+        }
+    }
+    loop _,p in [G.popup_bee, G.popup_eagle] {
+        if p.active {
+            rl.text_ex(font, string.format("%d", p.score), p.x, p.y, f32(f32(SIZE / 4) * p.scale), -5, rl.fade(0xFF4949FF, p.alpha))
+        }
+    }
+    loop _,p in G.popup_leaves {
+        if p.active {
+            rl.text_ex(font, string.format("+ %d", p.score), p.x, p.y, f32(f32(SIZE / 4) * p.scale), -5, rl.fade(0x8BB300FF, p.alpha))
+        }
+    }
+    rl.text_ex(font, string.format("%03d", currentLeaves), 47, 50, SIZE, -8, G.counter_color)
+    if G.transforming {
+        val t = "THIS ISN'T EVEN MY FINAL FORM!"
+        rl.text_ex(font, t, (W // 2) - (rl.measure(t, 40) // 2), H // 4, SIZE, -5, 0xF68585FF)
+    }
+    if G.transition_frames >= (SEASONTRANSITION // 2) {
+        loop _,m in MESSAGES {
+            if G.month == m@0 {
+                val t = if G.random_message <= 4 => m@1 => m@2
+                rl.text_ex(font, t, (W // 2) - (rl.measure(t, 40) // 2), H // 3, SIZE, -5, m@3)
+            }
+        }
+    }
+}
+
+;; [trace] of the test mode: as `TraceGameplayScreen` of the original
+func color_trace (c) { string.format("%08x", c) }
+func trace_rects (rs, actives, n) {
+    var m, sx, sy = 0, 0, 0
+    loop i in n {
+        if actives@i { set m = m | (1 << i) }
+        set sx, sy = sx + (rs@i).x, sy + (rs@i).y
+    }
+    string.format(" %x:%.3f:%.3f", m, sx, sy)
+}
+func trace_system_g (s, n) {
+    var c, sx, sy, sr, sa = 0, 0, 0, 0, 0
+    loop i in n {
+        val p = s.ps@i
+        if p.active {
+            set c += 1
+            set sx, sy, sr = sx + p.x, sy + p.y, sr + p.rot
+            set sa = sa + f32(p.alpha + p.size)
+        }
+    }
+    string.format(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", b(s.active), s.spawn, s.max, c, sx, sy, sr, sa)
+}
+func gameplay_trace () {
+    val P = G.player
+    var s = string.format(" %d %d %d %d %d %d | %.4f %.4f %d %.4f %.4f %d %d %d | %d %d %d %d %d %d | %d %d %d %d %d %d %d %d",
+        G.state, G.season, b(G.play), b(G.player_active), b(G.transforming), G.finish,
+        P.x, P.y, G.velocity, G.gravity, G.speed_mod, G.speed, G.jump_speed, G.grab,
+        currentLeaves, score, G.power, killer, G.kill_counter, G.start_counter,
+        G.month, G.month_timer, G.season_timer, G.bamboo_timer, G.bamboo_spawn, G.eagle_delay, G.global, seasons)
+    set s = s ++ string.format(" | %.4f %.4f %.4f %d %d %.4f %.4f %.4f %.4f %.4f %d %d %d %d %d %d %d %d %d",
+        G.scroll_front, G.scroll_middle, G.scroll_back, G.fog_position, int(G.ground), G.clock, G.clock_speed, G.fog_alpha, G.filter_alpha, G.ui_fade,
+        b(G.on_ice), b(G.on_resin), b(G.on_wind), b(G.cool_down), G.wind_counter, G.resin_count, G.trans_count, G.random_message, rainChance)
+    set s = s ++ " | " ++ color_trace(G.c0) ++ " " ++ color_trace(G.c1) ++ " " ++ color_trace(G.c2) ++ " " ++ color_trace(G.c3) ++ " " ++ color_trace(G.final_color)
+    set s = s ++ string.format(" %.4f %.4f %.4f %.4f %.4f", G.number_alpha, G.number_scale, G.glow_fade, G.pulse_fade, G.pulse_scale)
+    set s = s ++ " |"
+    set s = s ++ trace_rects(G.bamboo, G.bamboo_active, NB) ++ trace_rects(G.snake, G.snake_active, NE)
+    set s = s ++ trace_rects(G.dingo, G.dingo_active, NE) ++ trace_rects(G.owl, G.owl_active, NE)
+    set s = s ++ trace_rects(G.leaf, G.leaf_active, NL) ++ trace_rects(G.fire, G.fire_active, NF)
+    set s = s ++ trace_rects(G.ice, G.ice_active, NI) ++ trace_rects(G.resin, G.resin_active, NR)
+    set s = s ++ trace_rects(G.wind, G.wind_active, NW)
+    var h = 0
+    loop i in NE {
+        set h = h | (b(G.hit_snake@i) << i) | (b(G.hit_dingo@i) << (i + 16))
+    }
+    set s = s ++ string.format(" %x", h)
+    set s = s ++ string.format(" B%d%d%d:%.3f:%.3f E%d%d%d%d:%.3f:%.3f A%.3f:%.3f:%.3f:%.3f:%.3f:%.3f", b(G.bee_active), b(G.hit_bee), b(G.alert_bee_active), G.bee.x, G.bee.y,
+        b(G.eagle_active), b(G.hit_eagle), b(G.alert_active), b(G.eagle_alert), G.eagle.x, G.eagle.y, G.alert.x, G.alert.y, G.alert.h, G.bee_alert.x, G.bee_alert.y, G.bee_alert.h)
+    set s = s ++ " |"
+    loop _,k in [:snow, :back_snow, :planetree, :back_planetree, :dandelion, :dandelion_back, :flower, :back_flower, :rain, :back_rain] {
+        set s = s ++ trace_system_g(G@k, 128)
+    }
+    set s = s ++ trace_system_g(G.rain_storm, 512) ++ trace_system_g(G.snow_storm, 512)
+    var c, sx, sa = 0, 0, 0
+    loop i in 8 {
+        val r, k = G.rays.ps@i, G.back_rays.ps@i
+        if r.active {
+            set c, sx = c + 1, sx + r.x
+            set sa = sa + f32(r.alpha + r.delay)
+        }
+        if k.active {
+            set c, sx = c + 100, sx + k.x
+            set sa = sa + f32(k.alpha + k.delay)
+        }
+    }
+    set s = s ++ string.format(" R%d:%d:%d:%d:%d:%.3f:%.3f", b(G.rays.active), G.rays.spawn, G.rays.max, G.back_rays.spawn, c, sx, sa)
+    set c, sx, sa = 0, 0, 0
+    val sf = G.speed_fx
+    loop _,p in sf.ps {
+        if p.active {
+            set c = c + 1
+            set sx = sx + f32(p.x + p.y)
+            set sa = sa + f32(p.alpha + p.h)
+        }
+    }
+    set s = s ++ string.format(" S%d:%d:%d:%d:%.3f:%.3f", b(sf.active), sf.spawn, sf.max, c, sx, sa)
+    set c, sx, sa = 0, 0, 0
+    loop _,lp in G.leaf_particles {
+        if lp.active {
+            loop _,p in lp.ps {
+                set c = c + 1
+                set sx = sx + f32(p.x + p.y)
+                set sa = sa + f32(f32(p.alpha + p.size) + p.rot)
+            }
+        }
+    }
+    set s = s ++ string.format(" L%d:%.3f:%.3f", c, sx, sa)
+    set c, sx, sa = 0, 0, 0
+    loop i in NE {
+        val e, p = G.enemy_hit@i, G.popup_score@i
+        if e.active {
+            set c = c + 1
+            set sa = sa + f32(e.alpha + e.size)
+        }
+        if p.active {
+            set c = c + 100
+            set sx = sx + f32(f32(f32(p.x + p.y) + p.scale) + p.alpha)
+        }
+    }
+    loop _,p in G.popup_leaves {
+        if p.active {
+            set c = c + 10000
+            set sx = sx + f32(f32(f32(p.x + p.y) + p.scale) + p.alpha)
+        }
+    }
+    s ++ string.format(" P%d:%.3f:%.3f", c, sx, sa)
+}
+;; [/trace]

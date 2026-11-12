@@ -1,4 +1,297 @@
-;; (to come: the ending)
-func ending_init () { }
-func ending_trace () { "" }
-task Ending () { await false }
+;; The ending of koala_seasons (`screen_ending.c`): the painting of the
+;; death, and the counts of seasons, leaves and kills, one after the other
+;; (ENTER skips each), then ENTER, or the button, to play again.
+;;
+;; The phases (`endingCounter` of the C, kept for the trace) are a
+;; sequence; the counter of frames of the C stays, as the easings of the
+;; counts are functions of it.
+
+val E = [counter=0, frames=0, seasons=0, leaves=0, score=0, clock=0, kills_frames=0,
+         replaying=false, replay=0, play_color=rl.WHITE, shop_color=rl.WHITE,
+         trophy_color=rl.WHITE, share_color=rl.WHITE, active=[], leafs=[]]
+val DELAY, SEASONS_, LEAVES, KILLS, REPLAY = 0, 1, 2, 3, 4
+loop i in 128 { set E.active@i = false }
+loop i in 20 { set E.leafs@i = [] }
+
+val SEASON_TEXT = ["SUMMER", "AUTUMN", "WINTER", "SPRING"]
+val SEASON_ROT  = [225, 135, 45, 315]
+
+;; LinearEaseIn of the C, in floats
+func ease (t, b, c, d) {
+    f32(f32(f32(c * t) / d) + b)
+}
+
+func ending_init () {
+    set E.frames = -10
+    set E.replay, E.replaying = 0, false
+    set E.final_years = initYears + (seasons // 4)
+    set E.elapsed = seasons // 4
+    set E.play_color, E.shop_color, E.trophy_color, E.share_color = rl.WHITE, rl.WHITE, rl.WHITE, rl.WHITE
+    set E.score, E.seasons, E.leaves = 0, 0, 0
+    set E.counter = DELAY
+    loop _,p in E.leafs {
+        set p.active = false
+        set p.x = rl.random(-20, 20)
+        set p.y = rl.random(-20, 20)
+        set p.sx = f32(rl.random(-500, 500) / 100)
+        set p.sy = f32(rl.random(-500, 500) / 100)
+        set p.size = f32(rl.random(3, 10) / 5)
+        set p.rot = rl.random(0, 360)
+        set p.alpha = 1
+    }
+    set E.init_text = SEASON_TEXT@initSeason
+    set E.clock = SEASON_ROT@initSeason
+    set E.init_rot = SEASON_ROT@initSeason
+    set E.final_text = SEASON_TEXT@currentSeason
+    set E.final_rot = (SEASON_ROT@currentSeason) + (360 * E.elapsed)
+    loop i in 128 { set E.active@i = false }
+}
+
+val PLAY = [x=f32(W * 0.871), y=f32(H * 0.096), w=123, h=123]
+val SHOP = [x=f32(W * 0.871), y=f32(H * 0.303), w=123, h=123]
+val TROPHY = [x=f32(W * 0.871), y=f32(H * 0.513), w=123, h=123]
+val SHARE = [x=f32(W * 0.871), y=f32(H * 0.719), w=123, h=123]
+func mouse_in (r) {
+    rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), r.x, r.y, r.w, r.h)
+}
+
+;; The counts, one after the other. Each phase ends by itself or by ENTER;
+;; the button of play ends them all (`Ending` races them).
+task Counts () {
+    ;; the delay
+    loop on :rl.frame {
+        set E.frames += 1
+        until E.frames >= 10
+    }
+    set E.counter, E.frames = SEASONS_, 0
+    ;; the seasons
+    loop on :rl.frame {
+        set E.frames += 1
+        var over = false
+        if seasons > 0 {
+            set E.seasons = int(ease(E.frames, 0, seasons, 90))
+            set E.clock = ease(E.frames, E.init_rot, f32(-f32(E.final_rot - E.init_rot)), 90)
+            if E.frames >= 90 {
+                set E.frames, over = 0, true
+            }
+        } else {
+            set over = true
+        }
+        if rl.key_pressed('ENTER') {
+            set E.seasons, E.clock, E.frames, over = seasons, E.final_rot, 0, true
+        }
+        until over
+    }
+    set E.counter = LEAVES
+    ;; the leaves
+    loop on :rl.frame {
+        set E.frames += 1
+        var over = false
+        if currentLeaves > 0 {
+            if E.leaves == currentLeaves {
+                set E.frames, over = 0, true
+            } else {
+                if E.leaves < currentLeaves {
+                    if E.frames >= 4 {
+                        set E.leaves += 1
+                        set E.frames = 0
+                    }
+                    loop _,p in E.leafs {
+                        if !p.active {
+                            set p.x, p.y = f32(W * 0.46), f32(H * 0.32)
+                            set p.alpha, p.active = 1, true
+                        }
+                    }
+                }
+            }
+        } else {
+            set over = true
+        }
+        if rl.key_pressed('ENTER') {
+            set E.leaves, E.frames, over = currentLeaves, 0, true
+        }
+        until over
+    }
+    set E.counter = KILLS
+    ;; the kills
+    loop on :rl.frame {
+        set E.frames += 1
+        var over = false
+        if score > 0 {
+            if (E.frames <= 90) && !E.replaying {
+                set E.score = int(ease(E.frames, 0, score, 90))
+            }
+            set E.kills_frames += 1
+            loop i in 128 {
+                if (E.kills_frames >= 15) && !(E.active@i) {
+                    set E.active@i = true
+                    set E.kills_frames = 0
+                }
+            }
+            if E.frames >= 90 {
+                set E.frames, over = 0, true
+            }
+        } else {
+            set over = true
+        }
+        if rl.key_pressed('ENTER') {
+            set E.score, E.frames, over = score, 0, true
+            loop i in 128 { set E.active@i = true }
+        }
+        until over
+    }
+    set E.counter = REPLAY
+    await false
+}
+
+task Ending () {
+    spawn {
+        loop on :rl.draw { ending_draw() }
+    }
+    ;; the phases: the counts, or the button, then the replay
+    spawn {
+        par :any {
+            await :rl.frame until E.counter == REPLAY
+        } with {
+            await Counts()
+        }
+        loop {
+            set E.frames += 1
+            if rl.key_pressed('ENTER') { set E.replaying = true }
+            if E.replaying {
+                set E.replay += 1
+                if E.replay >= 30 {
+                    set pub = :gameplay
+                    set initSeason = rl.random(0, 3)
+                }
+                set E.play_color = rl.GOLD
+            }
+            await :rl.frame
+        }
+    }
+    ;; after them, in every frame: the leaves fly; the buttons light, and
+    ;; the one of play goes to the replay
+    loop on :rl.frame {
+        loop _,p in E.leafs {
+            if p.active {
+                set p.x = f32(p.x + p.sx)
+                set p.y = f32(p.y + p.sy)
+                set p.rot = f32(p.rot + 6)
+                set p.alpha = f32(p.alpha - f32(0.03))
+                set p.size = f32(p.size - 0.004)
+                if p.size <= 0 { set p.size = 0 }
+                if p.alpha <= 0 {
+                    set p.alpha, p.active = 0, false
+                }
+            }
+        }
+        if mouse_in(PLAY) {
+            set E.play_color = rl.GOLD
+            if rl.mouse_pressed(0) {
+                set E.counter, E.replaying = REPLAY, true
+            }
+        } else {
+            set E.play_color = rl.WHITE
+        }
+        set E.shop_color = if mouse_in(SHOP) => rl.GOLD => rl.WHITE
+        set E.trophy_color = if mouse_in(TROPHY) => rl.GOLD => rl.WHITE
+        set E.share_color = if mouse_in(SHARE) => rl.GOLD => rl.WHITE
+    }
+}
+
+func pro (r, x, y, c) {
+    rl.draw_texture_pro(atlas1, r.x, r.y, r.w, r.h, x, y, r.w, r.h, 0, 0, 0, c)
+}
+val PAINTS = [                          ;; by killer: the painting and where
+    [ATLAS01.ending_paint_koalafire, 0.145, 0.171],
+    [ATLAS01.ending_paint_koalasnake, 0.145, 0.171],
+    [ATLAS01.ending_paint_koaladingo, 0.145, 0.171],
+    [ATLAS01.ending_paint_koalaowl, 0.2, 0.3],
+    [ATLAS01.ending_paint_koalageneric, 0.133, 0.171],
+    [ATLAS01.ending_paint_koalabee, 0.145, 0.171],
+    [ATLAS01.ending_paint_koalaeagle, 0.145, 0.171],
+]
+val HEADS = [nil, ATLAS01.ending_plate_headsnake, ATLAS01.ending_plate_headdingo, ATLAS01.ending_plate_headowl,
+             ATLAS01.ending_plate_headbee, ATLAS01.ending_plate_headeagle]
+val DEATHS = [
+    ["Kissed by fire"],
+    ["Digested alive by a", "big snake"],
+    ["A dingo took your life"],
+    ["Turned into a pretty", "owl pellet"],
+    ["LIFE KILLED YOU"],
+    ["You turn out to be", "allergic to bee sting"],
+    ["KOALA IS DEAD :("],
+]
+
+func ending_draw () {
+    val bg = ATLAS02.ending_background
+    loop x in 15 {
+        rl.draw_texture_rec(atlas2, bg.x, bg.y, bg.w, bg.h, bg.w * (x % 5), bg.h * (x // 5), 0xB0A797FF)
+    }
+    pro(ATLAS01.ending_plate_frame, W * 0.042, H * 0.606, rl.WHITE)
+    pro(ATLAS01.ending_paint_back, W * 0.133, H * 0.097, rl.WHITE)
+    val paint = PAINTS@killer
+    if paint { pro(paint@0, W * (paint@1), H * (paint@2), rl.WHITE) }
+    pro(ATLAS01.ending_paint_frame, W * 0.102, H * 0.035, rl.WHITE)
+    pro(ATLAS01.ending_score_planksmall, W * 0.521, H * 0.163, rl.WHITE)
+    pro(ATLAS01.ending_score_planklarge, W * 0.415, H * 0.303, rl.WHITE)
+    pro(ATLAS01.ending_score_planksmall, W * 0.521, H * 0.440, rl.WHITE)
+    pro(ATLAS01.ending_score_seasonicon, W * 0.529, H * 0.096, rl.WHITE)
+    val n = ATLAS01.ending_score_seasonneedle
+    rl.draw_texture_pro(atlas1, n.x, n.y, n.w, n.h, W * 0.579, H * 0.189, n.w, n.h, n.w / 2, n.h * 0.9, E.clock, rl.WHITE)
+    pro(ATLAS01.ending_score_frame, W * 0.535, H * 0.11, rl.WHITE)
+    pro(ATLAS01.ending_score_frameback, W * 0.430, H * 0.246, rl.WHITE)
+    pro(ATLAS01.ending_score_frame, W * 0.429, H * 0.244, rl.WHITE)
+    val l = ATLAS01.particle_ecualyptusleaf
+    loop _,p in E.leafs {
+        if p.active {
+            rl.draw_texture_pro(atlas1, l.x, l.y, l.w, l.h, p.x, p.y, l.w * p.size, l.h * p.size,
+                (l.w / 2) * p.size, (l.h / 2) * p.size, p.rot, rl.fade(rl.WHITE, p.alpha))
+        }
+    }
+    pro(ATLAS01.ending_score_leavesicon, W * 0.421, H * 0.228, rl.WHITE)
+    pro(ATLAS01.ending_score_frameback, W * 0.536, H * 0.383, rl.WHITE)
+    pro(ATLAS01.ending_score_frame, W * 0.535, H * 0.383, rl.WHITE)
+    pro(ATLAS01.ending_score_enemyicon, W * 0.538, H * 0.414, rl.WHITE)
+    pro(ATLAS01.ending_button_replay, W * 0.871, H * 0.096, E.play_color)
+    pro(ATLAS01.ending_button_shop, W * 0.871, H * 0.303, E.shop_color)
+    pro(ATLAS01.ending_button_trophy, W * 0.871, H * 0.513, E.trophy_color)
+    pro(ATLAS01.ending_button_share, W * 0.871, H * 0.719, E.share_color)
+    rl.text_ex(font, string.format("%03d", E.seasons), f32(W * f32(0.73)), f32(H * f32(0.14)), SIZE, 1, rl.WHITE)
+    rl.text_ex(font, string.format("%03d", E.leaves), f32(W * f32(0.73)), f32(H * f32(0.29)), SIZE, 1, rl.WHITE)
+    rl.text_ex(font, string.format("%04d", E.score), f32(W * f32(0.715)), f32(H * f32(0.426)), SIZE, 1, rl.WHITE)
+    rl.text_ex(font, string.format("%s %d - %s %d", E.init_text, initYears, E.final_text, E.final_years),
+        f32(W * f32(0.1)), f32(H * f32(0.7)), SIZE / 2, 1, rl.WHITE)
+    loop i in 128 {
+        if E.active@i {
+            val h = HEADS@(killHistory@i)
+            if h {
+                rl.draw_texture_rec(atlas1, h.x, h.y, h.w, h.h, (W * 0.448) + (h.w * (i % 10)), (H * 0.682) + ((H * 0.055) * (i // 10)), rl.WHITE)
+            }
+        }
+    }
+    val lines = DEATHS@killer
+    if lines {
+        loop k,t in lines {
+            rl.text_ex(font, t, f32(W * f32(0.13)), f32(H * f32(if k == 0 => 0.78 => 0.83)), SIZE / 2, 1, rl.WHITE)
+        }
+    }
+}
+
+;; [trace] of the test mode: as `TraceEndingScreen` of the original
+func ending_trace () {
+    var c, sx, sy, sr, sa, ss = 0, 0, 0, 0, 0, 0
+    loop _,p in E.leafs {
+        if p.active {
+            set c += 1
+            set sx, sy, sr, sa, ss = sx + p.x, sy + p.y, sr + p.rot, sa + p.alpha, ss + p.size
+        }
+    }
+    var k = 0
+    loop i in 128 { if E.active@i { set k += 1 } }
+    val pc = E.play_color                 ;; as the bytes of the Color in memory
+    val le = ((pc >> 24) & 0xFF) | (((pc >> 16) & 0xFF) << 8) | (((pc >> 8) & 0xFF) << 16) | ((pc & 0xFF) << 24)
+    string.format(" %d %d %d %d %d %.4f %d %d %d %d %08x %d:%.3f:%.3f:%.3f:%.3f:%.3f", E.counter, E.frames, E.seasons, E.leaves, E.score, E.clock,
+        b(E.replaying), E.replay, E.kills_frames, k, le, c, sx, sy, sr, sa, ss)
+}
+;; [/trace]

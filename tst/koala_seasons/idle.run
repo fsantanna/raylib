@@ -1,0 +1,6 @@
+# The title, ENTER; the countdown; the koala grabs a tree, does nothing,
+# slides down and dies; the ending, its counts.
+FRAMES=1600
+SEED=1
+INPUT=700:dn:ENTER,701:up:ENTER
+SHOTS="701 720 730 760 800 850 900 1000 1100 1200 1300 1400 1500 1600"
