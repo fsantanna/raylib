@@ -471,3 +471,26 @@ the C of the original, in a prelude.
 | `endingResult` | drawn | `result` |
 | `exitGame` | control: the end of the program after the frame | the screen returns `:exit` after the drawing of its frame; **left**: `exiting`, for the trace |
 | `camera`, `playerPosition`, `playerCellX/Y`, `mapPixels`, the model | data | the C in the prelude |
+
+## koala_seasons
+
+The logo of `screens.atm`; the title, the gameplay and the ending in their
+own files. The transition is the one of the C, written in the game (the
+next screen is initialized when the transition is asked).
+
+| C | Kind | Port |
+|---|------|------|
+| `currentScreen`, `onTransition`, `transFadeOut`, `transAlpha`, `transToScreen` | control | the loop of the screens, with a fade in and a fade out; **left**: `current`, `trans`, `alpha`, `to`, which the trace prints |
+| `finishScreen` (each screen) | control | `pub` of the screen |
+| title: the particle systems, `currentValue1/2`, `color00..03` | data, drawn | `T`, tables as the structs of the C |
+| title: `framesCounter`, `thisFrame`, `currentFrame`, `globalFrameCounter` | control and data: the bounce (120 frames), the blink, the koala of the menu, the sway of the dandelions | **left**: `T.frames`, `T.this`, `T.frame`, `T.global` (functions of them are drawn; the trace prints them) |
+| gameplay: `play`, `playerActive`, `startCounter`, `finishScreen` | control: the countdown, the play, the fall of the dead koala | three loops in sequence in `Gameplay`; **left**: `G.play`, `G.player_active` (the drawing and the logic read them), `G.start_counter` (the countdown, eased) |
+| gameplay: `state` (`KoalaState`) | control: grabbed, jumping, kicking, final form, on the wind; never reset | **left**: `G.state`, read and changed all over the frame (by the collisions, the keys, the props) |
+| gameplay: `transforming`, `coolDown`, `transBackAnim`, `onIce`, `onResin`, `onWind`, `alertActive`, `eagleAlert`, `alertBeeActive`, `fog`, ... | control, read in the middle of the frame | **left**, in `G`: the frame of the C goes over them in one order, and several are never reset |
+| gameplay: `season`, `currentMonth`, `monthTimer`, `seasonTimer`, `transitionFramesCounter` | data: the seasons follow the months | `G.season`, `G.month`, ... |
+| gameplay: the entities (`bamboo`, `snake`, `dingo`, `owl`, `leaf`, `fire`, `ice`, `resin`, `wind`, `bee`, `eagle`) and their flags | data, in slots | lists in `G`, the same slots |
+| gameplay: the animation counters (`thisFrame*`, `curFrame*`) | data: frames of sprites, some changed while drawing (the fire) | `G` |
+| gameplay: the particle systems, popups, hits | data | `G`, as in the title |
+| ending: `endingCounter` | control: delay, seasons, leaves, kills, replay | the task `Counts`, then the replay; the button of play races them; **left**: `E.counter` (the trace) |
+| ending: `framesCounter` | data: the counts are eased on it | `E.frames` |
+| ending: `framesKillsCounter` | control; never reset | `E.kills_frames` |
