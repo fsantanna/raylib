@@ -362,3 +362,22 @@ fade; the end of the ritual goes back to the logo with no fade
 | `framesCounter` (gameplay), `ritualTime` | data: the time of the game, and a blinking warning | `frames`, `ritual_time` |
 | `player.lightEnergy` | data; never reset between games | `energy`, outside the screen |
 | `maxLightEnergy`, `currentLightEnergy`, `nextStarsAlignment` | data, and drawn | `total`, `lit`, `stars` |
+
+## transmission
+
+The screens as in `wave_collector`, with this game's black fade (0.02);
+its logo adds the logo of the team (200 frames in, 100 out) after the one
+of raylib.
+
+| C | Kind | Port |
+|---|------|------|
+| `framesCounter`, `writeTransmission`, `writeMission`, `writeEnd`, `transmissionLength`, `missionLength` (title) | control: a letter every 15 frames, first of one word, then of the other | two loops in sequence, raced by the button and ENTER |
+| `startWritting`, `writeNumber`, `writeMission`, `writtingMission`, `writeKeyword`, `writeEnd` (mission) | control: six phases of the typing of the mission | a sequence of waits and loops, raced by the button, which skips to the end |
+| `framesCounter` (mission) | control: the frames of the current phase, which the blink of the keyword goes on counting after a skip | **left**: `c` |
+| `blinkKeyWord` | drawn | `blink` |
+| `showButton` | control; never reset | **left**: `show_button`, outside the screen |
+| `state`, `rotation`, `scale` (ending) | control: the newspaper spins in, then the button | a loop that ends once whole and pressed; **left**: `ready` (the button is drawn from that frame) |
+| `framesCounter == 10` (ending) | control: a sound | `await rl.Frames(10)` |
+| `words[]` (`picked`, `hover`, `rec`) | data: drag and drop | `words` |
+| `messageWords[]`, the missions, the atlas, the headline | data, built from files and images | the C of the original, in the prelude |
+| `currentMission`, `fadeButton` | data; never reset | `mission`, `button_fade` |

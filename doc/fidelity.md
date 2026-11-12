@@ -469,3 +469,28 @@ Trace: frame; in the game also the player, its light, the level.
   was left from the first (35 in the run).
 - The lights come from a map in an image, read by the C of the original in
   a prelude of the port.
+
+## transmission
+
+Same as the original on its runs `start` (1900 frames, 19 screens: the two
+logos, the title, a mission skipped, a word dragged and left) and `play`
+(the four missions, all right, and the title again).
+
+Trace: frame, mission, the words placed in each place of the message. The
+C also prints "Current mission ..." when a mission starts, and so does the
+port.
+
+- **The original aborts on a wrong word.** With raylib 6.2,
+  `TextReplace` returns a static buffer, and the ending of the game (made
+  for a raylib that returned memory to free) calls `free` on it: `free():
+  invalid pointer`, as soon as a mission ends with a wrong word. The port,
+  whose C is the same, does not free it, so it goes on; no run with a
+  wrong word can be compared.
+- **Leftovers.** The words of the message are copied with `strncpy` and no
+  terminator, into slots never reset: a shorter word of a later mission
+  keeps the tail of the last one. The port keeps this C as it is.
+- **The blink after a skip** goes on from the frames the skipped phase had
+  counted, as in the C.
+- What builds data from files and images is the C of the original, in a
+  prelude: the missions (`LoadMissions`), the atlas of the words, the
+  layout of the message, the headline on the newspaper.
