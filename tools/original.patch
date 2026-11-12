@@ -130,3 +130,33 @@ index 144a118..f0c9b3c 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/space_invaders.c b/classics/src/space_invaders.c
+index 0634a67..9760206 100644
+--- a/classics/src/space_invaders.c
++++ b/classics/src/space_invaders.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #if defined(PLATFORM_WEB)
+     #include <emscripten/emscripten.h>
+ #endif
+@@ -346,6 +349,15 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic (the score only
++    // while the game is on: the rest of the frame of a game over may change it)
++    if (RltFrame() > 0)
++    {
++        if (gameOver) printf("%d over\n", RltFrame());
++        else printf("%d %s %.0f %.0f %d %d\n", RltFrame(), pause? "pause" : "play",
++            player.rec.x, player.rec.y, activeEnemies, score);
++    }
+ }
+ 
+ // Draw game (one frame)

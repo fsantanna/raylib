@@ -1,0 +1,223 @@
+;; raylib - classic game: space invaders
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/space_invaders.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `wave`, `smooth`, `victory`, `shootRate`,
+;; and the `active` flags of the C became tasks, awaits, and a toggle.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H   = 800, 450
+val f32    = rl.f32
+
+rl.window [title="classic game: space invaders", width=W, height=H, fps=60]
+
+var player  = [x=0, y=0]        ;; 20x20
+var enemies = []                ;; the enemies in play, in order: [x=,y=] (10x10)
+var score   = 0
+
+func overlap (a, aw, ah, b, bw, bh) {
+    rl.check_collision_recs(a.x, a.y, aw, ah, b.x, b.y, bw, bh)
+}
+
+func respawn (e) {
+    set e.x = rl.random(W, W + 1000)
+    set e.y = rl.random(0, H - 10)
+}
+
+;; An enemy: joins the game with its wave; then, in each frame, ends the
+;; game when it touches the player (who moved, and is not yet back inside
+;; the screen), moves left, and comes back from the right.
+task Enemy (game, i, e) {
+    await :rl.frame until #enemies > i
+    par {
+        loop {
+            if overlap(player, 20, 20, e, 10, 10) {
+                emit @game :over
+            }
+            set e.x -= 5
+            if e.x < 0 {
+                respawn(e)
+            }
+            await :rl.frame
+        }
+    } with {
+        loop on :rl.draw {
+            rl.rectangle_v(e.x, e.y, 10, 10, rl.GRAY)
+        }
+    }
+}
+
+var fire = nil                  ;; the gun asks the first free shot, in this frame
+
+;; A shot: a slot that waits to be fired, flies, and is free again. The
+;; first free slot takes the request of the gun, and moves at once, in the
+;; order of the slots, as in the C. In each frame it checks every enemy in
+;; order, even after a hit: one shot may take more than one enemy.
+task Shot (game) {
+    par {
+        loop {
+            set pub = nil
+            await :rl.frame until fire
+            set pub = fire
+            set fire = nil
+            loop {
+                set pub.x += 7
+                var done = (pub.x + 10) >= W
+                loop _,en in enemies {
+                    if overlap(pub, 10, 5, en, 10, 10) {
+                        respawn(en)
+                        set score += 100
+                        emit @game :killed
+                        set done = true
+                    }
+                }
+                if done {
+                    emit @game :rearm
+                }
+                until done
+                await :rl.frame
+            }
+        }
+    } with {
+        loop on :rl.draw {
+            if pub {
+                rl.rectangle_v(pub.x, pub.y, 10, 5, rl.MAROON)
+            }
+        }
+    }
+}
+
+;; One game: three waves, then the last one goes on. Ends when an enemy
+;; touches the player.
+;;
+;; The tasks are spawned in the order of the C, which here is also the order
+;; of the drawing: the waves, the player, the enemies, the player back inside
+;; the screen, the gun, the shots, the score.
+task Play () {
+    set player  = [x=20, y=50]
+    set enemies = []
+    set score   = 0
+    set fire    = nil
+    val all = []
+    loop i in 50 {
+        val x = rl.random(W, W + 1000)
+        val y = rl.random(0, H - 10)
+        set all@i = [x=x, y=y]
+    }
+    var title, alpha = "", 0
+
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle_v(player.x, player.y, 20, 20, rl.BLACK)
+            rl.text(title, (W//2) - (rl.measure(title,40)//2), (H//2) - 40, 40, rl.fade(rl.BLACK, alpha))
+        }
+    }
+    spawn {
+        ;; the waves: the title fades in and out; a wave ends at the start of
+        ;; the frame that finds exactly its number of kills (as the C)
+        var kills = 0
+        spawn {
+            loop on :killed {
+                set kills += 1
+            }
+        }
+        loop _,w in [[10,"FIRST WAVE"], [20,"SECOND WAVE"], [50,"THIRD WAVE"]] {
+            val n = w@0
+            set title, alpha, kills = w@1, 0, 0
+            loop i in (#enemies, n-1) {
+                vector.insert(enemies, all@i)
+            }
+            par :any {
+                loop on :rl.frame {
+                    set alpha = f32(alpha + f32(0.02))
+                    until alpha >= 1
+                }
+                set alpha = f32(alpha - f32(0.02))
+                loop on :rl.frame {
+                    set alpha = f32(alpha - f32(0.02))
+                }
+            } with {
+                await :rl.frame until kills == n
+                if n == 50 {
+                    emit :victory
+                    await false
+                }
+            }
+        }
+    }
+    spawn {
+        loop on :rl.frame {
+            if rl.key_down('RIGHT') { set player.x += 5 }
+            if rl.key_down('LEFT')  { set player.x -= 5 }
+            if rl.key_down('UP')    { set player.y -= 5 }
+            if rl.key_down('DOWN')  { set player.y += 5 }
+        }
+    }
+    pin ens = tasks()
+    loop i in 50 {
+        spawn @ens Enemy(task, i, all@i)
+    }
+    spawn {
+        ;; the player back inside the screen, after the enemies
+        loop on :rl.frame {
+            if player.x <= 0 { set player.x = 0 }
+            if (player.x + 20) >= W { set player.x = W - 20 }
+            if player.y <= 0 { set player.y = 0 }
+            if (player.y + 20) >= H { set player.y = H - 20 }
+        }
+    }
+    spawn {
+        ;; the gun: a shot every 4 frames with SPACE held, counted again
+        ;; after a shot hits or leaves the screen
+        loop {
+            watching :rearm {
+                loop {
+                    loop _ in 4 {
+                        await :rl.frame until rl.key_down('SPACE')
+                    }
+                    set fire = [x=player.x, y=player.y + 5]
+                }
+            }
+        }
+    }
+    pin shots = tasks(50)
+    loop _ in 50 {
+        spawn @shots Shot(task)
+    }
+    spawn {
+        par {
+            loop on :rl.draw {
+                rl.text(string.format("%04d", score), 20, 20, 40, rl.GRAY)
+            }
+        } with {
+            await :victory
+            val s = "YOU WIN"
+            loop on :rl.draw {
+                rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.BLACK)
+            }
+        }
+    }
+    await :over
+}
+
+;; [trace] of the test mode: one line per frame, after its logic; the score
+;; is shown while the game is on (see doc/fidelity.md)
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            if phase == :over {
+                print(string.format("%d %s", rl.frame(), phase))
+            } else {
+                print(string.format("%d %s %.0f %.0f %d %d", rl.frame(), phase, player.x, player.y, #enemies, score))
+            }
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)

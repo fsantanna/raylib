@@ -168,3 +168,29 @@ rotation), time.
   next game places them again, so nothing shows it.
 - The time is counted first in the frame, as the C does, so that the frame
   of the game over counts.
+
+## space_invaders
+
+Same as the original on its runs `play` (3477 frames, 18 screens: SPACE
+held through the three waves and "YOU WIN", a pause, then the enemies, an
+ENTER in the frame of the game over, a restart) and `seed4` (2000 frames, 8
+screens: other enemies).
+
+Trace: frame, phase, player, enemies in play, score. In the frame of a game
+over only the phase: the C goes on with the rest of that frame (the
+enemies move, and a shot may still score), while the port ends the game at
+once. None of it is drawn, and the next game starts again from zero, so the
+score of that frame is left out of both traces.
+
+- **Order.** In each frame, every shot, in the order of its slot, checks
+  every enemy in order, and keeps checking after a hit: a shot may take two
+  enemies, and each kill draws a new position. To keep the draws in the
+  same order, the shots are 50 tasks spawned once, as the slots of the C,
+  and the gun asks the first free one, which takes the request in the same
+  frame and moves at once (an await started in the middle of a frame would
+  only see the next one). The enemies are 50 tasks too, which join the game
+  with their wave, in the same frame.
+- **The waves** end at the start of the frame that finds exactly their
+  number of kills, as the C (`==`), so the port counts the kills.
+- After the first fade, the title of the wave keeps being drawn with a
+  negative alpha, which `Fade` turns into 0, as in the C.

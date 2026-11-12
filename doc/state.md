@@ -112,3 +112,26 @@ of bricks, which the C counts in its trace.
 | `.radius`, `.color` | constant (the color is never used) | `r`, `color` |
 
 Left in the port for the trace only: `phase`.
+
+## space_invaders
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control | `Play` awaits `:over`, which an enemy emits when it touches the player |
+| `pause` | control | `Classic` |
+| `wave` | control: an enum and a `switch` with three copies of the same case | a `loop` over the three waves |
+| `smooth` | control: the title fades in, then out | two loops in sequence: until `alpha >= 1`, then forever |
+| `victory` | control | `:victory`, emitted once by the last wave; the score task then also draws "YOU WIN" |
+| `shootRate` | control: a count of the frames with SPACE held, reset by a hit | the gun: `await :rl.frame until rl.key_down('SPACE')` four times per shot, restarted by `:rearm` |
+| `enemiesKill` | control: the kills of the wave, compared with `==` | **left**: `kills`, local to the waves, since the C compares it exactly (two kills in one frame at the end of a wave would keep the wave forever) |
+| `enemy[].active` | control: always true, never cleared | gone |
+| `shoot[].active` | control | the phase of each `Shot`: waits to be fired, then flies until it hits or leaves |
+| `activeEnemies` | data: how many enemies are in play | `#enemies`, which the waves extend |
+| `alpha` | drawn | `alpha` |
+| `score` | score | `score` |
+| `player.rec`, `enemy[].rec`, `shoot[].rec` | drawn | `player`, `enemies`, the `pub` of each `Shot` |
+| `.speed`, `.color` | constant | literals |
+
+The port adds `fire`: the request of the gun, which the first free shot
+takes in the same frame. Left in the port for the trace only: `phase`.
