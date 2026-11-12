@@ -44,3 +44,28 @@ which the game never reads.
 | `score`, `hiScore` | score | `score`, `hiscore` |
 
 Left in the port for the trace only: `phase`.
+
+## gold_fever
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control | the rules of `Play` end it (`until dead`), after the home of that frame is checked, as in the C |
+| `pause` | control | `toggle play(false) with :rl.draw` |
+| `follow` | control: the enemy chases from anywhere, and a red frame is drawn | the phase between `:picked` and `:stored`, in the enemy and in the task of the red frame |
+| `points.active` | control: the gold is out, to be picked | the task of the gold: awaits `:touch.gold`, then `:touch.home`; the gold is drawn by a task that lives until `:picked` |
+| `home.active` | control: set when the gold is picked, never read | gone |
+| `home.save` | control: the player was in the home at the end of the last frame; read by the enemy and by the rules in the next one | **left**: `safe`, a level, written by the rules at the end of each frame |
+| `player.position` | drawn | `player` |
+| `player.speed`, `player.radius` | constant | `5`, `20` |
+| `enemy.position` | drawn | `enemy.x`, `enemy.y` |
+| `enemy.speed` | data: grows with each point | `enemy.speed` |
+| `enemy.moveRight` | data: the direction of the patrol | `right`, local to the enemy |
+| `enemy.radius`, `enemy.radiusBounds` | constant | `20`, `150` |
+| `points.position` | drawn | `gold` |
+| `points.radius`, `points.value` | constant | `10`, `100` |
+| `home.rec` | drawn | `home` (its size is the constant `50`) |
+| `home.color` | constant, never used | gone |
+| `score`, `hiScore` | score | `score`, `hiscore` |
+
+Left in the port for the trace only: `phase`.

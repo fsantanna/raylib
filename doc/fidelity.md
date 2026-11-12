@@ -99,3 +99,21 @@ As in the C:
   they were spawned, and floppy, spawned before them, has already moved.
 - The 100 pairs are drawn and moved in every frame, even far out of the
   screen.
+
+## gold_fever
+
+Same as the original on its runs `play` (1009 frames, 19 screens: four
+points with a pause, the enemy, an ENTER in the frame of the game over, a
+restart, one more point) and `caught` (360 frames, 8 screens, seed 2: the
+enemy catches the player with the gold).
+
+Trace: frame, phase, player, enemy, score, best score.
+
+The C draws in one order (home, enemy, player, gold) and updates in
+another (player, enemy, gold, enemy again, home). A task that both moves and
+draws one thing cannot follow both, so the port spawns the looks first, in
+the order they are drawn, and the behaviors after them, in the order of the
+C. The checks of the gold, the enemy, and the home are one task, the last,
+which emits `:touch.gold` and `:touch.home` in the order of the C. As in the
+C, a game that ends still checks the home in that frame: a point scored
+there is not in the best score.

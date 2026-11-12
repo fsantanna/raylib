@@ -407,6 +407,9 @@ val rl = [
     circle = func (x, y, r, c) {
         `DrawCircle(RL_I($x), RL_I($y), RL_F($r), rl_color($c));`
     },
+    circle_lines = func (x, y, r, c) {
+        `DrawCircleLines(RL_I($x), RL_I($y), RL_F($r), rl_color($c));`
+    },
     circle_v = func (x, y, r, c) {
         `DrawCircleV((Vector2){RL_F($x),RL_F($y)}, RL_F($r), rl_color($c));`
     },

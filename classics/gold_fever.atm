@@ -1,0 +1,209 @@
+;; raylib - classic game: gold fever
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/gold_fever.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `follow`, `points.active`, and
+;; `home.active` of the C became tasks, awaits, and a toggle.
+
+include "../raylib.atm"
+
+val W, H = 800, 450
+
+rl.window [title="classic game: gold fever", width=W, height=H, fps=60]
+
+var player = [x=0, y=0]
+var enemy  = [x=0, y=0, speed=0]
+var gold   = [x=0, y=0]
+var home   = [x=0, y=0]
+var score  = 0
+var hiscore = 0
+var phase  = :play              ;; :play, :pause, or :over (for the trace)
+
+func place_gold () {
+    val x = rl.random(10, W - 10)
+    val y = rl.random(10, H - 10)
+    [x=x, y=y]
+}
+
+;; One game. Ends when the enemy catches the player out of the home.
+task Play () {
+    set player = [x=50, y=50]
+    set enemy  = [x=W-50, y=H//2, speed=3]
+    set gold   = place_gold()
+    set home   = [x=rl.random(0, W-50), y=rl.random(0, H-50)]
+    set score  = 0
+    var safe   = false          ;; the player was in the home at the end of the last frame
+
+    ;; The looks, in the order they are drawn.
+
+    spawn {
+        ;; a red frame while the enemy follows the gold
+        loop {
+            await :picked
+            watching :stored {
+                loop on :rl.draw {
+                    rl.rectangle(0, 0, W, H, rl.RED)
+                    rl.rectangle(10, 10, W-20, H-20, rl.RAYWHITE)
+                }
+            }
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle_lines(home.x, home.y, 50, 50, rl.BLUE)
+            rl.circle_lines(enemy.x, enemy.y, 150, rl.RED)
+            rl.circle_v(enemy.x, enemy.y, 20, rl.MAROON)
+            rl.circle_v(player.x, player.y, 20, rl.GRAY)
+        }
+    }
+    spawn {
+        ;; the gold, until it is picked, and again once it is stored
+        loop {
+            watching :picked {
+                loop on :rl.draw {
+                    rl.circle_v(gold.x, gold.y, 10, rl.GOLD)
+                }
+            }
+            await :stored
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            rl.text(string.format("SCORE: %04d", score), 20, 15, 20, rl.GRAY)
+            rl.text(string.format("HI-SCORE: %04d", hiscore), 300, 15, 20, rl.GRAY)
+        }
+    }
+
+    ;; The behaviors, in the order of the C.
+
+    spawn {
+        ;; the player, with the arrows held, inside the screen
+        loop on :rl.frame {
+            if rl.key_down('RIGHT') { set player.x += 5 }
+            if rl.key_down('LEFT')  { set player.x -= 5 }
+            if rl.key_down('UP')    { set player.y -= 5 }
+            if rl.key_down('DOWN')  { set player.y += 5 }
+            if (player.x - 20) <= 0 { set player.x = 20 }
+            if (player.x + 20) >= W { set player.x = W - 20 }
+            if (player.y - 20) <= 0 { set player.y = 20 }
+            if (player.y + 20) >= H { set player.y = H - 20 }
+        }
+    }
+    spawn {
+        ;; the enemy: patrols from side to side, and chases the player when
+        ;; near, or always while the gold is out of its place, unless the
+        ;; player is safe in the home
+        var right = true
+        val step = func (chase) {
+            if chase {
+                if player.x > enemy.x { set enemy.x += enemy.speed }
+                if player.x < enemy.x { set enemy.x -= enemy.speed }
+                if player.y > enemy.y { set enemy.y += enemy.speed }
+                if player.y < enemy.y { set enemy.y -= enemy.speed }
+            } else {
+                set enemy.x += if right => enemy.speed => -enemy.speed
+            }
+            if (enemy.x - 20) <= 0 { set right = true }
+            if (enemy.x + 20) >= W { set right = false }
+            if (enemy.x - 20) <= 0 { set enemy.x = 20 }
+            if (enemy.x + 20) >= W { set enemy.x = W - 20 }
+            if (enemy.y - 20) <= 0 { set enemy.y = 20 }
+            if (enemy.y + 20) >= H { set enemy.y = H - 20 }
+        }
+        loop {
+            watching :picked {
+                loop on :rl.frame {
+                    step(!safe && rl.check_collision_circles(player.x, player.y, 20, enemy.x, enemy.y, 150))
+                }
+            }
+            watching :stored {
+                loop on :rl.frame {
+                    step(!safe)
+                }
+            }
+        }
+    }
+    spawn {
+        ;; the gold: picked by the player, stored in the home, and placed again
+        loop {
+            await :touch.gold
+            emit :picked
+            await :touch.home
+            set score += 100
+            set enemy.speed += 0.5
+            set gold = place_gold()
+            emit :stored
+        }
+    }
+
+    ;; The rules, after everything moved, in the order of the C: the gold,
+    ;; the enemy, the home. A game that ends still checks the home.
+    loop on :rl.frame {
+        if rl.check_collision_circles(player.x, player.y, 20, gold.x, gold.y, 10) {
+            emit :touch.gold
+        }
+        val dead = !safe && rl.check_collision_circles(player.x, player.y, 20, enemy.x, enemy.y, 20)
+        if dead {
+            set hiscore = math.max(score, hiscore)
+        }
+        set safe = rl.check_collision_circle_rec(player.x, player.y, 20, home.x, home.y, 50, 50)
+        if safe {
+            emit :touch.home
+        }
+        until dead
+    }
+}
+
+;; One game, with its pause: P stops the play, which keeps being drawn.
+task Game () {
+    set phase = :play
+    pin play = spawn Play()
+    spawn {
+        loop {
+            await :rl.key.dn [name='P']
+            toggle play(false) with :rl.draw
+            set phase = :pause
+            watching :rl.key.dn [name='P'] {
+                val s = "GAME PAUSED"
+                loop on :rl.draw {
+                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.GRAY)
+                }
+            }
+            toggle play(true)
+            set phase = :play
+        }
+    }
+    await(play)
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %s %.1f %.1f %.1f %.1f %d %d", rl.frame(), phase,
+                player.x, player.y, enemy.x, enemy.y, score, hiscore))
+        }
+    }
+}
+;; [/trace]
+
+loop {
+    await Game()
+    set phase = :over
+    watching :rl.key.dn [name='ENTER'] {
+        val s = "PRESS [ENTER] TO PLAY AGAIN"
+        loop on :rl.draw {
+            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
+        }
+    }
+    await :rl.frame         ;; the frame of ENTER only starts the next game
+}

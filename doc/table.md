@@ -17,3 +17,4 @@ the runs: no number here is typed by hand.
 |------|--------:|------------:|---------:|-------------:|----------:|-------------:|-----:|------|
 | snake | 181 | 121 | 1509 | 911 | 5 | 0 | 2 (1220 frames, 16 screens) | yes |
 | floppy | 143 | 117 | 1054 | 686 | 4 | 0 | 2 (2746 frames, 25 screens) | yes |
+| gold_fever | 178 | 162 | 1470 | 1222 | 6 | 1 | 2 (1369 frames, 27 screens) | yes |
