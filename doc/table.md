@@ -27,3 +27,4 @@ the runs: no number here is typed by hand.
 | gorilas | 351 | 183 | 2994 | 1662 | 6 | 0 | 2 (1008 frames, 44 screens) | yes |
 | asteroids | 402 | 262 | 3940 | 2176 | 7 | 1 | 2 (1249 frames, 25 screens) | yes |
 | pang | 446 | 210 | 4072 | 1791 | 8 | 2 | 2 (2998 frames, 38 screens) | yes |
+| platformer | 466 | 170 | 3277 | 1767 | 4 | 0 | 2 (1634 frames, 43 screens) | yes |

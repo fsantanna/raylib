@@ -222,6 +222,31 @@ index 4482932..e330e7d 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/platformer.c b/classics/src/platformer.c
+index 77dfccc..883b3d8 100644
+--- a/classics/src/platformer.c
++++ b/classics/src/platformer.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #if defined(PLATFORM_WEB)
+     #include <emscripten/emscripten.h>
+ #endif
+@@ -230,6 +233,10 @@ void UpdateGame(void)
+             InitGame();
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0) printf("%d %.6f %.6f %.6f %.6f %.6f %.6f %d %d\n", RltFrame(), player.position.x, player.position.y,
++        player.velocity.x, player.velocity.y, player.hsp, player.vsp, input.jump, score);
+ }
+ 
+ // Draw game (every frame)
 diff --git a/classics/src/snake.c b/classics/src/snake.c
 index 144a118..f0c9b3c 100644
 --- a/classics/src/snake.c

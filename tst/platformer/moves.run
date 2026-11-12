@@ -1,0 +1,7 @@
+# By hand: the left wall, a jump into the platform above (the ceiling), a
+# short tap that cuts the jump, a jump pressed in the air (latched until
+# landing), A and D, and the right wall.
+FRAMES=900
+SEED=1
+INPUT=5:dn:LEFT,120:dn:SPACE,150:up:SPACE,160:up:LEFT,170:dn:D,190:up:D,200:dn:SPACE,202:up:SPACE,240:dn:A,250:dn:SPACE,290:up:SPACE,300:dn:SPACE,330:up:SPACE,331:up:A,360:dn:RIGHT,400:dn:SPACE,402:up:SPACE,412:dn:SPACE,450:up:SPACE,600:up:RIGHT,610:dn:SPACE,640:up:SPACE,700:dn:LEFT,740:up:LEFT,741:dn:SPACE,745:up:SPACE
+SHOTS="1 60 125 140 205 260 310 405 420 500 620 745 760 900"

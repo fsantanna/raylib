@@ -224,3 +224,23 @@ the game), so it does not use `Classic`.
 | `score` | score | `score` |
 
 Left in the port for the trace only: `phase`.
+
+## platformer
+
+`platformer` has no pause and no game over: it shows "PRESS [ENTER]" once
+the coins are taken, and the game goes on.
+
+| C | Kind | Port |
+|---|------|------|
+| `win` | control: all the coins taken | `await :all coins`, then the text, then ENTER |
+| `player.isJumping` | control: a jump in course | the phase of `Jumper` between two awaits of `:gravity` |
+| `player.isGrounded` | data: a sensor, computed in each frame | `grounded`, local to the frame, sent in `:gravity` |
+| `player.hitOnFloor`, `hitOnCeiling`, `hitOnWall` | control, never read | gone |
+| `input.jump` | data: the button, latched until released or used; never reset | `jump`, also across games |
+| `input.right`, `left`, `up`, `down` | data: the keys of the frame (`up` and `down` never read) | `right`, `left`, local to the frame |
+| `coins[].visible` | control | the task `Coin`, which ends when taken |
+| `player.position`, `velocity`, `hsp`, `vsp` | drawn, and data | `player` |
+| `player.direction`, `delta` | data of the frame | `dir`, `delta`, local |
+| `player.maxSpd`, `acc`, `dcc`, `gravity`, `jumpImpulse`, `jumpRelease`, `width`, `height` | constant | `MAXSPD`, `ACC`, `DCC`, `GRAVITY`, `IMPULSE`, `RELEASE`, literals |
+| `tiles[]`, `camera`, `screenScale`, `screenWidth`, `screenHeight` | constant | `tiles`, `SCALE`, the window |
+| `score` | score | `score` |

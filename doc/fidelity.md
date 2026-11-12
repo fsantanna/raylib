@@ -307,3 +307,31 @@ of a game over, the phase only.
 - The popups rise and fade after the logic of every frame, even in a pause
   or after the game; the port updates them at the start of the drawing, the
   first thing after all the logic.
+
+## platformer
+
+Same as the original on its runs `play` (734 frames, 29 screens: the ten
+coins, "PRESS [ENTER]", ENTER, the ten coins again) and `moves` (900
+frames, 14 screens: walls, a ceiling, a cut jump, a jump pressed in the
+air, A and D).
+
+Trace: frame, position, speed, remainders (6 decimals), the jump button,
+score.
+
+- **Frame time.** The physics multiplies by `GetFrameTime()`: 0 in the
+  first frame, then 1/60 as a float. This is where the patch of raylib had
+  to start its test mode before `InitTimer` (see above).
+- **Floats and pixels.** Speeds are floats; the position moves by whole
+  pixels, and the rest is kept for the next frame. The port does the same
+  steps (`rl.f32`, `math.floor` for the casts to `int` of positive values).
+- **The map.** The C reads a tile past the right edge (it checks `x > 20`,
+  not `x >= 20`) from the next row; the port does the same.
+- **The jump** is a sequence that reacts to `:gravity`, which the physics
+  emits where the C decides the jump: on the ground with the button, a
+  jump; in the air, it ends on the ground (which clears the button) or when
+  the button is released (which cuts the speed).
+- The coins are found by a search over a simulation of the C
+  (`tst/platformer/gen.py`).
+- What can differ, and no run does: ENTER pressed in the very frame the
+  last coin is taken (the C restarts in that frame; the port, which hears
+  ENTER before the coin is taken, in the next one).

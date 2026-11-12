@@ -1,0 +1,221 @@
+;; raylib - classic game: platformer
+;;
+;; Sample game developed by Agnis "NeZvers" Aldiņš (@nezvers).
+;; Copyright (c) 2020 Agnis "NeZvers" Aldiņš (@nezvers) and Ramon
+;; Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/platformer.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `win`, `isJumping`, and the `visible` flags of the coins of the
+;; C became tasks and awaits.
+
+include "../raylib.atm"
+
+val TILE    = 16
+val MW, MH  = 20, 12            ;; the map, in tiles
+val SCALE   = 2
+val f32     = rl.f32
+
+rl.window [title="classic game: platformer", width=TILE*MW*SCALE, height=TILE*MH*SCALE, fps=60]
+
+;; The map: a border and four platforms.
+val tiles = []
+loop y in MH {
+    loop x in MW {
+        set tiles@(x + (y*MW)) = (y == 0) || (x == 0) || (y == (MH-1)) || (x == (MW-1))
+    }
+}
+loop _,t in [[3,8],[4,8],[5,8], [8,6],[9,6],[10,6], [13,7],[14,7],[15,7], [1,10]] {
+    set tiles@((t@0) + ((t@1)*MW)) = true
+}
+
+;; As in the C, a tile out of the map is empty, except one past its right
+;; or bottom edge, which reads the next row (the C checks `x > 20`, not
+;; `x >= 20`).
+func solid (x, y) {
+    if (x < 0) || (y < 0) {
+        return false
+    }
+    val tx, ty = x // TILE, y // TILE
+    if (tx > MW) || (ty > MH) {
+        return false
+    }
+    tiles@(tx + (ty*MW)) == true
+}
+
+func sign (x) {
+    ifs {
+        x < 0      => -1
+        x < 0.0001 => 0
+        else       => 1
+    }
+}
+
+;; The steps of the C, on floats.
+val MAXSPD  = f32(f32(1.5625)*60)
+val ACC     = f32(f32(f32(0.118164)*60)*60)
+val DCC     = f32(f32(f32(0.113281)*60)*60)
+val GRAVITY = f32(f32(f32(0.363281)*60)*60)
+val IMPULSE = f32(f32(-6.5625)*60)
+val RELEASE = f32(IMPULSE*f32(0.2))
+
+var player = [x=0, y=0, vx=0, vy=0, hsp=0, vsp=0]
+var jump   = false              ;; the button, latched until released or used (never reset, as the C)
+var score  = 0
+
+;; The physics of the player, in the order of the C. In the middle of it,
+;; where the C decides the jump, it emits `:gravity [grounded=]`.
+task Physics (game) {
+    val W2, H1 = 4, 16          ;; half the width, the height
+    loop on :rl.frame {
+        val delta = rl.frame_time()
+        val right = rl.key_down('D') || rl.key_down('RIGHT')
+        val left  = rl.key_down('A') || rl.key_down('LEFT')
+        if rl.key_pressed('SPACE') {
+            set jump = true
+        } else {
+            if rl.key_released('SPACE') { set jump = false }
+        }
+        ;; on the ground: below the center, or below one of the sides
+        val x, y = math.floor(player.x), math.floor(player.y) + 1
+        val grounded = solid(x, y) || solid(x - W2, y) || solid((x + W2) - 1, y)
+        ;; the horizontal speed
+        val dir = (if right => 1 => 0) - (if left => 1 => 0)
+        if dir != 0 {
+            set player.vx = f32(player.vx + f32(f32(dir*ACC)*delta))
+            set player.vx = math.max(-MAXSPD, math.min(player.vx, MAXSPD))
+        } else {
+            val d = f32(DCC*delta)
+            ifs {
+                math.abs(player.vx) < d => { set player.vx = 0 }
+                player.vx > 0 => { set player.vx = f32(player.vx - d) }
+                else => { set player.vx = f32(player.vx + d) }
+            }
+        }
+        ;; the jump, then gravity
+        emit @game :gravity [grounded=grounded]
+        set player.vy = f32(player.vy + f32(GRAVITY*delta))
+        if player.vy > -IMPULSE {
+            set player.vy = -IMPULSE
+        }
+        ;; the blocks, to the side, then above or below
+        val steps = func () {
+            val xv = f32(f32(player.vx*delta) + player.hsp)
+            val yv = f32(f32(player.vy*delta) + player.vsp)
+            return (math.floor(math.abs(xv)) * sign(xv)), (math.floor(math.abs(yv)) * sign(yv))
+        }
+        do {
+            val xsp, _ = steps()
+            if xsp != 0 {
+                val side = if xsp > 0 => (W2 - 1) => -W2
+                val px, py = math.floor(player.x), math.floor(player.y)
+                val tx = (px + side) + xsp
+                if solid(tx, py) || solid(tx, py - 8) || solid(tx, (py - H1) + 1) {
+                    set player.x = if xsp > 0 => (((tx & ~15) - 1) - side) => (((tx & ~15) + TILE) - side)
+                    set player.vx, player.hsp = 0, 0
+                }
+            }
+        }
+        do {
+            val _, ysp = steps()
+            if ysp != 0 {
+                val side = if ysp > 0 => 0 => (1 - H1)
+                val px, py = math.floor(player.x), math.floor(player.y)
+                val ty = (py + side) + ysp
+                if solid(px, ty) || solid(px - W2, ty) || solid((px + W2) - 1, ty) {
+                    set player.y = if ysp > 0 => (((ty & ~15) - 1) - side) => (((ty & ~15) + TILE) - side)
+                    set player.vy, player.vsp = 0, 0
+                }
+            }
+        }
+        ;; the move, by whole pixels; the rest is kept for the next frame
+        val xsp, ysp = steps()
+        set player.hsp = f32(f32(player.vx*delta) - xsp)
+        set player.vsp = f32(f32(player.vy*delta) - ysp)
+        set player.x = math.max(0, math.min(player.x + xsp, MW*TILE))
+        set player.y = math.max(0, math.min(player.y + ysp, MH*TILE))
+    }
+}
+
+;; The jump: on the ground with the button, a jump; in the air, it ends on
+;; the ground (which uses the button) or when the button is released (which
+;; cuts its speed).
+task Jumper () {
+    loop {
+        await :gravity until it.grounded && jump
+        set player.vy = IMPULSE
+        val e = await :gravity until it.grounded || !jump
+        if e.grounded {
+            set jump = false
+        } else {
+            if player.vy < RELEASE {
+                set player.vy = RELEASE
+            }
+        }
+    }
+}
+
+;; A coin: taken when the player touches it.
+task Coin (x, y) {
+    watching :rl.frame until rl.check_collision_recs(f32(player.x - 4), f32((player.y - 16) + 1), 8, 16, x, y, 4, 4) {
+        loop on :rl.draw {
+            rl.rectangle(x, y, 4, 4, rl.GOLD)
+        }
+    }
+    set score += 1
+}
+
+;; One game: ends with ENTER, once the coins are taken.
+task Play () {
+    set player = [x=f32((TILE*MW)*0.5), y=((MH*TILE) - 16) - 1, vx=0, vy=0, hsp=0, vsp=0]
+    set score = 0
+    spawn {
+        loop on :rl.draw {
+            rl.begin_mode2d(0, 0, 0, 0, 0, SCALE)
+            rl.clear(rl.RAYWHITE)
+            loop i,t in tiles {
+                if t {
+                    rl.rectangle((i % MW)*TILE, (i // MW)*TILE, TILE, TILE, rl.GRAY)
+                }
+            }
+        }
+    }
+    spawn Physics(task)
+    spawn Jumper()
+    pin coins = tasks()
+    loop _,c in [[1,7],[3,5],[4,5],[5,5],[8,3],[9,3],[10,3],[13,4],[14,4],[15,4]] {
+        spawn @coins Coin(((c@0)*16) + 6, ((c@1)*16) + 6)
+    }
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle(player.x - 4, (player.y - 16) + 1, 8, 16, rl.RED)
+            rl.end_mode2d()
+            val s = string.format("SCORE: %d", score)
+            rl.text(s, (rl.width()//2) - (rl.measure(s,40)//2), 50, 40, rl.BLACK)
+        }
+    }
+    await :all coins
+    spawn {
+        val s = "PRESS [ENTER] TO PLAY AGAIN"
+        loop on :rl.draw {
+            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
+        }
+    }
+    await :rl.key.dn [name='ENTER']
+    await :rl.frame         ;; the player still moves in the frame of ENTER
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %.6f %.6f %.6f %.6f %.6f %.6f %d %d", rl.frame(),
+                player.x, player.y, player.vx, player.vy, player.hsp, player.vsp, if jump => 1 => 0, score))
+        }
+    }
+}
+;; [/trace]
+
+loop {
+    await Play()
+}
