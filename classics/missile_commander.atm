@@ -1,0 +1,224 @@
+;; raylib - classic game: missile commander
+;;
+;; Sample game developed by Marc Palau and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/missile_commander.c`
+;; of raysan5/raylib-games. The game is the same; `gameOver`, `pause`, and
+;; the `active` flags of the missiles and of the explosions became tasks.
+;; Where the order of the slots of the C decides what happens (the
+;; interceptors, the explosions), the port keeps the slots: see
+;; doc/fidelity.md.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H   = 800, 450
+val f32    = rl.f32
+val GAP    = W // 10            ;; between launchers and buildings
+val EXPLOSION_COLOR = rl.color(125, 125, 125, 125)
+
+rl.window [title="classic game: missile commander", width=W, height=H, fps=60]
+
+;; As the statics of the C, these outlive a game: the frames played, and the
+;; next slot of an interceptor and of an explosion.
+var frames = 0
+var inum, xnum = 0, 0
+val interceptors = []           ;; 30 slots: [on=, ox=,oy=, x=,y=, tx=,ty=, sx=,sy=]
+loop i in 30 { set interceptors@i = [on=false] }
+val stale = []                  ;; 100 slots of explosions: the last multiplier of each
+loop i in 100 { set stale@i = 0 }
+
+var score = 0
+var launchers = []              ;; [x=, y=, on=]
+var buildings = []
+var missiles_on = 0             ;; for the trace
+
+;; The speed toward a target, as the C: a module on doubles, kept in a float.
+func toward (ox, oy, tx, ty, speed) {
+    val m = f32(math.sqrt(math.pow(f32(tx - ox), 2) + math.pow(f32(ty - oy), 2)))
+    return f32(f32(f32(tx - ox) * speed) / m), f32(f32(f32(ty - oy) * speed) / m)
+}
+
+;; An explosion: grows for 90 frames, shrinks until frame 210, and ends. It
+;; starts with the multiplier that its slot kept from the last explosion, as
+;; in the C, until it first grows. It grows on `:grow`, which comes after
+;; the missiles in each frame; it is drawn by `Play`.
+task Explosion (x, y) {
+    val slot = xnum
+    set xnum = (xnum + 1) % 100
+    set pub = [x=x, y=y, mult=stale@slot]
+    loop f in (1, 210) {
+        await :grow
+        set pub.mult = if f <= 90 => f32(f/90) => f32(1 - f32(f32(f - 90)/210))
+        set stale@slot = pub.mult
+    }
+    await :grow
+}
+
+;; A missile: falls toward its target, and ends below the screen, on a
+;; launcher or a building (which it destroys), or in an explosion. As in the
+;; C, one that hits a launcher or a building is still checked against the
+;; buildings and the explosions, and always scores in the explosion it just
+;; made.
+task Missile (game, booms) {
+    val ox, oy = rl.random(20, W - 20), -10
+    val tx, ty = rl.random(20, W - 20), H + 10
+    val sx, sy = toward(ox, oy, tx, ty, 1)
+    var x, y = ox, oy
+    set missiles_on += 1
+    defer {
+        set missiles_on -= 1
+    }
+    val boom = func () {
+        spawn @booms Explosion(x, y)
+    }
+    par :any {
+        loop on :rl.frame {
+            set x, y = f32(x + sx), f32(y + sy)
+            until y > H
+            var hit = false
+            loop _,l in launchers {
+                if l.on && rl.check_collision_point_rec(x, y, l.x - 40, l.y - 40, 80, 80) {
+                    set l.on, hit = false, true
+                    boom()
+                    break
+                }
+            }
+            loop _,b in buildings {
+                if b.on && rl.check_collision_point_rec(x, y, b.x - 30, b.y - 30, 60, 60) {
+                    set b.on, hit = false, true
+                    boom()
+                    break
+                }
+            }
+            loop _,e in booms {
+                if rl.check_collision_point_circle(x, y, e.pub.x, e.pub.y, f32(40*e.pub.mult)) {
+                    set score += 100
+                    set hit = true
+                    boom()
+                    break
+                }
+            }
+            until hit
+        }
+    } with {
+        loop on :rl.draw {
+            rl.line(ox, oy, x, y, rl.RED)
+            if (frames % 16) < 8 {
+                rl.circle(x, y, 3, rl.YELLOW)
+            }
+        }
+    }
+}
+
+;; One game: ends at the end of the frame that finds no launcher or no
+;; building, as in the C (the rest of that frame changes the next game).
+;;
+;; In each frame, in the order of the C: the frames played, the
+;; interceptors, the missiles, the explosions, the outgoing and the incoming
+;; fire. Drawn in the order of the C: the missiles, the interceptors, the
+;; explosions, the launchers and buildings, the score.
+task Play () {
+    set score = 0
+    set launchers = [ [x=GAP*1, y=H-40, on=true], [x=GAP*5, y=H-40, on=true], [x=GAP*9, y=H-40, on=true] ]
+    set buildings = []
+    loop _,i in [2, 3, 4, 6, 7, 8] {
+        vector.insert(buildings, [x=GAP*i, y=H-30, on=true])
+    }
+    loop _,c in interceptors {
+        set c.on = false
+    }
+    pin booms = tasks()
+
+    spawn {
+        loop on :rl.frame {
+            set frames += 1
+        }
+    }
+    spawn {
+        ;; the interceptors, in the order of their slots: the first one to
+        ;; arrive explodes and stops the others for this frame (the `break`)
+        loop on :rl.frame {
+            loop _,c in interceptors {
+                if c.on {
+                    set c.x, c.y = f32(c.x + c.sx), f32(c.y + c.sy)
+                    val d = f32(math.sqrt(math.pow(f32(c.x - c.tx), 2) + math.pow(f32(c.y - c.ty), 2)))
+                    if d < 10 {
+                        set c.on = false
+                        spawn @booms Explosion(c.x, c.y)
+                        break
+                    }
+                }
+            }
+        }
+    }
+    pin missiles = tasks()
+    spawn {
+        loop on :rl.frame {
+            emit :grow
+            ;; outgoing fire: a click fires from the launcher of its button
+            var n = 0
+            if rl.mouse_pressed(0) { set n = 1 }
+            if rl.mouse_pressed(2) { set n = 2 }
+            if rl.mouse_pressed(1) { set n = 3 }
+            if (n > 0) && (launchers@(n-1)).on {
+                val l = launchers@(n-1)
+                val c = interceptors@inum
+                set c.on = true
+                set c.ox, c.oy, c.x, c.y = l.x, l.y, l.x, l.y
+                set c.tx, c.ty = rl.mouse_x(), rl.mouse_y()
+                set c.sx, c.sy = toward(c.ox, c.oy, c.tx, c.ty, 10)
+                set inum = (inum + 1) % 30
+            }
+            ;; incoming fire: a missile every 80 frames played
+            if (frames % 80) == 0 {
+                spawn @missiles Missile(task, booms)
+            }
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            loop _,c in interceptors {
+                if c.on {
+                    rl.line(c.ox, c.oy, c.x, c.y, rl.GREEN)
+                    if (frames % 16) < 8 {
+                        rl.circle(c.x, c.y, 3, rl.BLUE)
+                    }
+                }
+            }
+            loop _,e in booms {
+                rl.circle(e.pub.x, e.pub.y, f32(40*e.pub.mult), EXPLOSION_COLOR)
+            }
+            loop _,l in launchers {
+                if l.on { rl.rectangle(l.x - 40, l.y - 40, 80, 80, rl.GRAY) }
+            }
+            loop _,b in buildings {
+                if b.on { rl.rectangle(b.x - 30, b.y - 30, 60, 60, rl.LIGHTGRAY) }
+            }
+            rl.text(string.format("SCORE %4d", score), 20, 20, 40, rl.LIGHTGRAY)
+        }
+    }
+    loop on :rl.frame {
+        val l = loop _,x in launchers { until x.on }
+        val b = loop _,x in buildings { until x.on }
+        until !l || !b
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic; the
+;; missiles only while the game is on (see doc/fidelity.md)
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            if phase == :over {
+                print(string.format("%d %s %d %d", rl.frame(), phase, score, frames))
+            } else {
+                print(string.format("%d %s %d %d %d", rl.frame(), phase, score, frames, missiles_on))
+            }
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)

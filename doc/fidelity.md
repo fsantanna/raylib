@@ -194,3 +194,37 @@ score of that frame is left out of both traces.
   number of kills, as the C (`==`), so the port counts the kills.
 - After the first fade, the title of the wave keeps being drawn with a
   negative alpha, which `Fade` turns into 0, as in the C.
+
+## missile_commander
+
+Same as the original on its runs `play` (4112 frames, 23 screens: the
+missiles shot down for 2000 frames with a pause, then the city falls; an
+ENTER in the frame of the game over, a restart, a game with no clicks) and
+`seed3` (2700 frames, 11 screens).
+
+Trace: frame, phase, score, frames played, missiles in flight (not in the
+game over, where the C keeps its array full until the next game, and the
+port's missiles are gone; nothing shows it).
+
+This is the classic where the slots of the C decide the most:
+
+- The first interceptor to arrive explodes and `break`s the loop: the
+  interceptors in the slots after it do not move in that frame. The port
+  keeps the 30 slots, their ring (`inum`, never reset), and the loop.
+- A missile that hits a launcher or a building makes an explosion, and is
+  still checked against the buildings and the explosions: the explosion it
+  just made always contains it, so it scores 100 and makes a second one.
+- A new explosion keeps the multiplier of the radius that its slot had
+  (0 the first time, then the last value of the explosion before it), until
+  it grows at the end of the frame; missiles checked in between see it. The
+  port keeps the ring of 100 (`xnum`, never reset) and the last value of
+  each slot.
+- `framesCounter` and the indices are never reset: a second game launches
+  its missiles at the phase where the first one stopped. The port keeps
+  `frames` and the indices as globals.
+- The game ends at the end of the frame, as in the C, since the rest of that
+  frame (a click, a launch) changes the next game.
+- What the port does not keep: the missiles are a pool in launch order,
+  which is the order of their slots until the 101st missile (8000 frames of
+  play) reuses slot 0; and the ring of explosions would overwrite a live
+  explosion only with 100 alive at once. No run comes near either.

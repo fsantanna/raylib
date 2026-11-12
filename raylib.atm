@@ -393,6 +393,7 @@ val rl = [
     key_pressed  = func (k) { `:boolean IsKeyPressed(rl_key($k))` },
     key_released = func (k) { `:boolean IsKeyReleased(rl_key($k))` },
     mouse_down   = func (b) { `:boolean IsMouseButtonDown(RL_I($b))` },
+    mouse_pressed = func (b) { `:boolean IsMouseButtonPressed(RL_I($b))` },
     mouse_x      = func ()  { `:number GetMousePosition().x` },
     mouse_y      = func ()  { `:number GetMousePosition().y` },
 
@@ -456,6 +457,9 @@ val rl = [
     },
     check_collision_circles = func (x1, y1, r1, x2, y2, r2) {
         `:boolean CheckCollisionCircles((Vector2){RL_F($x1),RL_F($y1)}, RL_F($r1), (Vector2){RL_F($x2),RL_F($y2)}, RL_F($r2))`
+    },
+    check_collision_point_circle = func (px, py, cx, cy, r) {
+        `:boolean CheckCollisionPointCircle((Vector2){RL_F($px),RL_F($py)}, (Vector2){RL_F($cx),RL_F($cy)}, RL_F($r))`
     },
     check_collision_point_rec = func (px, py, x, y, w, h) {
         `:boolean CheckCollisionPointRec((Vector2){RL_F($px),RL_F($py)}, (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)})`

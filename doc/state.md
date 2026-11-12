@@ -135,3 +135,26 @@ Left in the port for the trace only: `phase`.
 
 The port adds `fire`: the request of the gun, which the first free shot
 takes in the same frame. Left in the port for the trace only: `phase`.
+
+## missile_commander
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `framesCounter` | control: a missile every 80 frames, the blinking every 16; never reset, so a second game goes on with the count of the first | **left**: `frames`, also across games |
+| `gameOver` | control | the last loop of `Play`, at the end of each frame, as in the C |
+| `pause` | control | `Classic` |
+| `missile[].active` | control | the task `Missile`, which ends below the screen or on a hit |
+| `missile[]` `.origin`, `.position`, `.objective`, `.speed` | drawn, and data | locals of `Missile` |
+| `missileIndex` (static) | control: the next slot | gone: the missiles are a pool in the order they are launched (see fidelity) |
+| `interceptor[].active` | control: read by a loop with a `break` that couples the slots | **left**: `on`, in 30 slots, since the first interceptor to arrive stops the ones after it |
+| `interceptorNumber` (static) | control: the next slot, never reset | **left**: `inum` |
+| `interceptor[]` `.origin`, `.position`, `.objective`, `.speed` | drawn, and data | the slots |
+| `explosion[].frame` | control: 90 frames up, 120 down | `loop f in (1, 210)` in the task `Explosion` |
+| `explosion[].active` | control | the task `Explosion` |
+| `explosion[].position`, `.radiusMultiplier` | drawn | the `pub` of `Explosion` |
+| `explosionIndex` | control: the next slot, never reset; a new explosion keeps the multiplier its slot had | **left**: `xnum`, with `stale`, the last multiplier of each slot |
+| `launcher[]`, `building[]` | drawn: what is left of the city | `launchers`, `buildings`, with `on` |
+| `score` | score | `score` |
+
+Left in the port for the trace only: `phase`, `missiles_on`.

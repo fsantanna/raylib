@@ -1,0 +1,8 @@
+# Each missile shot down for 2000 frames (and a pause of 60), then the
+# missiles destroy the city; an ENTER in the frame of the game over
+# (ignored), a restart, and 900 frames of a game with no clicks, which goes
+# on with the counters of the first. Made by gen.py.
+FRAMES=4112
+SEED=1
+INPUT=120:mv:104:78,120:md:0,121:mu:0,200:mv:221:58,200:md:0,201:mu:0,280:mv:274:63,280:md:2,281:mu:2,360:mv:552:81,360:md:2,361:mu:2,440:mv:567:50,440:md:1,441:mu:1,520:mv:482:78,520:md:2,521:mu:2,600:mv:398:76,600:md:2,601:mu:2,680:mv:346:63,680:md:2,681:mu:2,760:mv:456:66,760:md:2,761:mu:2,840:mv:88:78,840:md:0,841:mu:0,920:mv:358:73,920:md:2,921:mu:2,1000:dn:P,1001:up:P,1060:mv:506:79,1060:md:2,1060:dn:P,1061:mu:2,1061:up:P,1140:mv:555:76,1140:md:2,1141:mu:2,1220:mv:39:78,1220:md:0,1221:mu:0,1300:mv:535:68,1300:md:2,1301:mu:2,1380:mv:164:78,1380:md:0,1381:mu:0,1460:mv:74:77,1460:md:0,1461:mu:0,1540:mv:625:75,1540:md:1,1541:mu:1,1620:mv:191:49,1620:md:0,1621:mu:0,1700:mv:518:72,1700:md:2,1701:mu:2,1780:mv:523:56,1780:md:2,1781:mu:2,1860:mv:476:72,1860:md:2,1861:mu:2,1940:mv:646:73,1940:md:1,1941:mu:1,2020:mv:700:46,2020:md:1,2021:mu:1,3181:dn:ENTER,3182:up:ENTER,3211:dn:ENTER,3212:up:ENTER
+SHOTS="1 80 160 166 186 257 277 334 354 409 491 566 1000 1030 2000 2500 3180 3181 3182 3211 3212 3812 4112"

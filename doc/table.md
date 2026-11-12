@@ -23,3 +23,4 @@ the runs: no number here is typed by hand.
 | arkanoid | 207 | 150 | 2005 | 1312 | 4 | 0 | 2 (22977 frames, 23 screens) | yes |
 | asteroids_survival | 241 | 182 | 2262 | 1471 | 3 | 0 | 2 (4531 frames, 22 screens) | yes |
 | space_invaders | 271 | 207 | 1903 | 1252 | 9 | 1 | 2 (5477 frames, 26 screens) | yes |
+| missile_commander | 343 | 202 | 2796 | 1615 | 10 | 4 | 2 (6812 frames, 34 screens) | yes |

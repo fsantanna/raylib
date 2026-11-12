@@ -104,6 +104,36 @@ index c067c9f..d6b1506 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/missile_commander.c b/classics/src/missile_commander.c
+index 408fbe3..b47f471 100644
+--- a/classics/src/missile_commander.c
++++ b/classics/src/missile_commander.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <time.h>
+@@ -383,6 +386,15 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        int on = 0;
++        for (int i = 0; i < MAX_MISSILES; i++) on += missile[i].active;
++        if (gameOver) printf("%d over %d %d\n", RltFrame(), score, framesCounter);
++        else printf("%d %s %d %d %d\n", RltFrame(), pause? "pause" : "play", score, framesCounter, on);
++    }
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/snake.c b/classics/src/snake.c
 index 144a118..f0c9b3c 100644
 --- a/classics/src/snake.c
