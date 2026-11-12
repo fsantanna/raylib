@@ -1,0 +1,237 @@
+;; raylife: Conway's Game of Life on a board of 500 by 500.
+;;
+;; From raysan5/raylib-games (`raylife/src/raylife.c`), zlib license.
+;;
+;; Ported to Atmos: an altered version. The game is the same; its two modes
+;; (`playMode` in the C) are two tasks in sequence. The board, its step,
+;; and its drawing are the loops of the C, in the prelude below: they go
+;; over 250000 cells.
+;;
+;;      raylife [max generations]       (500 by default)
+
+include "../../raylib.atm"
+
+```:prelude
+#define LIFE_ROWS 500
+#define LIFE_COLS 500
+#define LIFE_SPACING 50
+
+static int LIFE[LIFE_ROWS][LIFE_COLS];
+static int LIFE_NEXT[LIFE_ROWS][LIFE_COLS];
+
+static void life_clear (void) {
+    memset(LIFE, 0, sizeof(LIFE));
+}
+
+// Toggles a cell; returns the change in the number of cells alive.
+static int life_toggle (int x, int y) {
+    if (x >= 0 && x < LIFE_COLS && y >= 0 && y < LIFE_ROWS) {
+        LIFE[y][x] = !LIFE[y][x];
+        return LIFE[y][x] ? 1 : -1;
+    }
+    return 0;
+}
+
+// One generation; returns the number of cells alive.
+static int life_step (void) {
+    int alive = 0;
+    for (int i = 0; i < LIFE_ROWS; i++) {
+        for (int j = 0; j < LIFE_COLS; j++) {
+            int n = 0;
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    if (dx == 0 && dy == 0) continue;
+                    n += LIFE[(i + dy + LIFE_ROWS) % LIFE_ROWS][(j + dx + LIFE_COLS) % LIFE_COLS];
+                }
+            }
+            LIFE_NEXT[i][j] = (LIFE[i][j] && (n == 2 || n == 3)) || (!LIFE[i][j] && n == 3);
+            alive += LIFE_NEXT[i][j];
+        }
+    }
+    memcpy(LIFE, LIFE_NEXT, sizeof(LIFE));
+    return alive;
+}
+
+static void life_draw (void) {
+    for (int i = 0; i <= LIFE_ROWS; i++) {
+        DrawLineV((Vector2){ 0, i*LIFE_SPACING }, (Vector2){ LIFE_COLS*LIFE_SPACING, i*LIFE_SPACING }, GRAY);
+    }
+    for (int j = 0; j <= LIFE_COLS; j++) {
+        DrawLineV((Vector2){ j*LIFE_SPACING, 0 }, (Vector2){ j*LIFE_SPACING, LIFE_ROWS*LIFE_SPACING }, GRAY);
+    }
+    for (int i = 0; i < LIFE_ROWS; i++) {
+        for (int j = 0; j < LIFE_COLS; j++) {
+            if (LIFE[i][j]) {
+                Vector2 pos = { j*LIFE_SPACING, i*LIFE_SPACING };
+                DrawRectangleV(pos, (Vector2){ LIFE_SPACING, LIFE_SPACING }, WHITE);
+                DrawRectangleLinesEx((Rectangle){ pos.x, pos.y, LIFE_SPACING, LIFE_SPACING }, 1, BLACK);
+            }
+        }
+    }
+}
+```
+
+val W, H    = 1000, 900
+val SPACING = 50
+val f32     = rl.f32
+val MAX     = do {
+    val args = [...]
+    val n = tonumber(args@0)
+    if n && (n >= 1) => n => 500
+}
+
+rl.window [title="RayLife", width=W, height=H, fps=60]
+
+val camera = [ox=f32(W/2), oy=f32(H/2), tx=f32((500*SPACING)/2), ty=f32((500*SPACING)/2), zoom=1]
+var alive, gens = 0, 0
+var interval = f32(0.2)
+var last = 0                    ;; the time of the last generation
+var mode = :draw                ;; (for the trace)
+
+;; One generation, if the interval has passed since the last one.
+func generation () {
+    val t = rl.time()
+    if (t - last) >= interval {
+        set alive = `:number life_step()`
+        set gens += 1
+        set last = t
+    }
+}
+
+;; The frame of the C, in three parts, which the modes and the controls
+;; follow: :f1, the mode is decided; :f2, the camera, R, and the interval;
+;; :f3, the mode acts.
+spawn {
+    loop on :rl.frame {
+        emit :f1
+        emit :f2
+        emit :f3
+    }
+}
+
+;; The controls, the same in both modes.
+spawn {
+    loop on :f2 {
+        if rl.mouse_down(1) {
+            val s = f32(-1 / camera.zoom)
+            set camera.tx = f32(camera.tx + f32(rl.mouse_dx() * s))
+            set camera.ty = f32(camera.ty + f32(rl.mouse_dy() * s))
+        }
+        val wheel = rl.wheel()
+        if wheel != 0 {
+            val x, y = rl.screen_to_world2d(rl.mouse_x(), rl.mouse_y(), camera.ox, camera.oy, camera.tx, camera.ty, 0, camera.zoom)
+            set camera.ox, camera.oy = rl.mouse_x(), rl.mouse_y()
+            set camera.tx, camera.ty = x, y
+            var k = f32(1 + f32(0.25 * math.abs(wheel)))
+            if wheel < 0 {
+                set k = f32(1 / k)
+            }
+            set camera.zoom = math.max(0.125, math.min(f32(camera.zoom * k), 64))
+        }
+        if rl.key_pressed('R') {
+            set gens, alive, interval = 0, 0, f32(0.2)
+            `life_clear();`
+            emit @:global :to.draw
+        }
+        if rl.key_pressed('UP') {
+            set interval = math.min(f32(interval + f32(0.1)), MAX)
+        }
+        if rl.key_pressed('DOWN') {
+            set interval = math.max(f32(interval - f32(0.1)), 0)
+        }
+    }
+}
+
+;; The modes, each a task, from the first part of the frame to the next.
+;; Draw: the left button toggles cells, and SPACE makes one generation when
+;; it cannot start Play (no cells, or no generations to go). Play: a
+;; generation per interval. SPACE goes from one to the other. Back to Draw
+;; also with R (in the second part of the frame), with no cells (in the
+;; first), or after the last generation (in the third). A mode that starts
+;; in the middle of a frame acts in the parts that are left of it.
+
+task Draw () {
+    set mode = :draw
+    par {
+        loop on :f1 {
+            if alive == 0 {
+                set gens = 0
+            }
+            if rl.key_pressed('SPACE') && (alive > 0) && (gens < MAX) {
+                emit @:global :to.play
+            }
+        }
+    } with {
+        loop on :f3 {
+            if rl.mouse_pressed(0) {
+                val x, y = rl.screen_to_world2d(rl.mouse_x(), rl.mouse_y(), camera.ox, camera.oy, camera.tx, camera.ty, 0, camera.zoom)
+                set alive += `:number life_toggle((int)(RL_F($x)/50), (int)(RL_F($y)/50))`
+            }
+            if rl.key_pressed('SPACE') {
+                generation()
+            }
+        }
+    }
+}
+
+task Play () {
+    set mode = :play
+    par {
+        loop on :f1 {
+            if alive == 0 {
+                set gens = 0
+                emit @:global :to.draw
+            }
+            if rl.key_pressed('SPACE') && (alive > 0) && (gens < MAX) {
+                emit @:global :to.draw
+            }
+        }
+    } with {
+        loop on :f3 {
+            if alive > 0 {
+                generation()
+                if gens >= MAX {
+                    emit @:global :to.draw
+                }
+            }
+        }
+    }
+}
+
+spawn {
+    loop {
+        watching :to.play {
+            await Draw()
+        }
+        watching :to.draw {
+            await Play()
+        }
+    }
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.BLACK)
+        rl.rectangle(5, 5, 300, 110, rl.fade(rl.RAYWHITE, 0.9))
+        rl.text(if mode == :play => "Play mode" => "Draw mode", 10, 10, 20, rl.BLACK)
+        rl.text(string.format("Generation: %d (Max: %d)", gens, MAX), 10, 35, 20, rl.BLACK)
+        rl.text(string.format("Cells: %d", alive), 10, 60, 20, rl.BLACK)
+        rl.text(string.format("Generation interval: %.1fs", interval), 10, 85, 20, rl.BLACK)
+        rl.begin_mode2d(camera.ox, camera.oy, camera.tx, camera.ty, 0, camera.zoom)
+        `life_draw();`
+        rl.end_mode2d()
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %s %d %d %.6f %.6f %.6f %.6f %.6f %.6f", rl.frame(), mode, gens, alive, interval,
+                camera.zoom, camera.ox, camera.oy, camera.tx, camera.ty))
+        }
+    }
+}
+;; [/trace]
+
+await :rl.quit

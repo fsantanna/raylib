@@ -266,3 +266,15 @@ the coins are taken, and the game goes on.
 | `level`, `gravitySpeed` | constant (never changed) | `30` |
 
 Left in the port for the trace only: `phase`.
+
+## raylife
+
+| C | Kind | Port |
+|---|------|------|
+| `playMode` | control: read at three points of the frame, and changed at each of them | the tasks `Draw` and `Play`, in sequence, over three parts of the frame (`:f1`, `:f2`, `:f3`); **left**: `mode`, which the text "Play mode" / "Draw mode" reads |
+| `board` | data, and drawn | the board in C, in the prelude of the port (its step and its drawing go over 250000 cells) |
+| `aliveCells`, `generations` | data, and drawn | `alive`, `gens` |
+| `lastGenerationTime` | data: the time of the last generation | `last` |
+| `generations_interval` | data: set by UP and DOWN | `interval` |
+| `camera` | data | `camera` |
+| `maxGenerations` | constant, from the command line | `MAX` |

@@ -1,0 +1,8 @@
+# A glider and a blinker drawn with clicks; Play; the interval down twice;
+# back to Draw and one generation with SPACE; Play again with a longer
+# interval; a drag of the camera with the right button, the wheel in and
+# out; R; SPACE with no cells; a click after R.
+FRAMES=800
+SEED=1
+INPUT=10:mv:575:475,10:md:0,11:mu:0,13:mv:625:525,13:md:0,14:mu:0,16:mv:525:575,16:md:0,17:mu:0,19:mv:575:575,19:md:0,20:mu:0,22:mv:625:575,22:md:0,23:mu:0,25:mv:775:725,25:md:0,26:mu:0,28:mv:825:725,28:md:0,29:mu:0,31:mv:875:725,31:md:0,32:mu:0,60:dn:SPACE,61:up:SPACE,200:dn:DOWN,201:up:DOWN,260:dn:DOWN,261:up:DOWN,400:dn:SPACE,401:up:SPACE,420:dn:SPACE,421:up:SPACE,440:dn:UP,441:up:UP,450:dn:SPACE,451:up:SPACE,600:mv:300:300,601:md:1,610:mv:350:320,620:mv:420:380,621:mu:1,650:mv:500:450,650:wh:1,670:wh:2,690:wh:-1,720:dn:R,721:up:R,740:dn:SPACE,741:up:SPACE,760:mv:520:470,760:md:0,761:mu:0
+SHOTS="1 40 60 100 200 300 400 420 445 500 600 625 680 700 721 740 761 800"

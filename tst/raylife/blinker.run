@@ -1,0 +1,7 @@
+# A blinker; Play for 270 frames; R in Play with a click in the same frame
+# (Draw acts in that frame); a blinker again, Play, Draw, one generation
+# with SPACE in Draw, Play with a longer interval, Draw.
+FRAMES=600
+SEED=1
+INPUT=10:mv:525:475,10:md:0,11:mu:0,13:mv:575:475,13:md:0,14:mu:0,16:mv:625:475,16:md:0,17:mu:0,30:dn:SPACE,31:up:SPACE,300:mv:625:575,300:md:0,300:dn:R,301:mu:0,301:up:R,320:mv:525:475,320:md:0,321:mu:0,323:mv:575:475,323:md:0,324:mu:0,326:mv:625:475,326:md:0,327:mu:0,340:dn:SPACE,341:up:SPACE,400:dn:SPACE,401:up:SPACE,430:dn:SPACE,431:up:SPACE,431:dn:UP,432:up:UP,500:dn:SPACE,501:up:SPACE
+SHOTS="1 20 31 100 299 300 301 330 340 400 420 431 450 500 600"

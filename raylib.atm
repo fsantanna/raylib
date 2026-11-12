@@ -397,6 +397,15 @@ val rl = [
     mouse_pressed = func (b) { `:boolean IsMouseButtonPressed(RL_I($b))` },
     mouse_x      = func ()  { `:number GetMousePosition().x` },
     mouse_y      = func ()  { `:number GetMousePosition().y` },
+    mouse_dx     = func ()  { `:number GetMouseDelta().x` },
+    mouse_dy     = func ()  { `:number GetMouseDelta().y` },
+    wheel        = func ()  { `:number GetMouseWheelMove()` },
+
+    ;; rl.screen_to_world2d(x, y, ox, oy, tx, ty, rot, zoom): x and y
+    screen_to_world2d = func (x, y, ox, oy, tx, ty, rot, zoom) {
+        `Vector2 rl_w2d = GetScreenToWorld2D((Vector2){RL_F($x),RL_F($y)}, (Camera2D){ (Vector2){RL_F($ox),RL_F($oy)}, (Vector2){RL_F($tx),RL_F($ty)}, RL_F($rot), RL_F($zoom) });`
+        return `:number rl_w2d.x`, `:number rl_w2d.y`
+    },
 
     ;; Colors
     color = func (r, g, b, a) {

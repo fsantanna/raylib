@@ -356,3 +356,26 @@ Trace: frame, phase, position of the piece, lines, full and moving cells.
 - The repeats of the keys are counted in the frames of fall only (not in
   the frame a piece appears, nor while lines blink), and carry from a piece
   to the next, as the counters of the C.
+
+## raylife
+
+Same as the original on its runs `play` (800 frames, 18 screens: a glider
+and a blinker drawn with clicks, Play until they die, the interval, a drag
+and the wheel, R, SPACE with no cells) and `blinker` (600 frames, 15
+screens: Play for a long while, R in Play with a click in the same frame,
+Play and Draw with SPACE).
+
+Trace: frame, mode, generations, cells, interval, camera.
+
+- **The frame in three parts.** The C reads `playMode` before the camera,
+  then R may clear it, then it acts on it. The port splits its frame in
+  three events, and each mode is a task that reacts to the parts it needs:
+  a mode that starts in the middle of a frame (after SPACE in the first
+  part, after R in the second) acts in the parts that are left, as the C.
+- **Time.** A generation comes when `GetTime()` has passed the interval (a
+  float) since the last one, as in the C; in the test mode, every 13
+  frames for 0.2 s (12 frames are a hair less than 0.2 in doubles).
+- **SPACE with no cells** makes one generation (the count shows 1 for a
+  frame), and the next frame sets it back to 0, as in the C.
+- The board, its step, and its drawing are the loops of the C, in a
+  prelude of the port.

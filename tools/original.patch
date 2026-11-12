@@ -337,3 +337,28 @@ index 0dd7eeb..808cf29 100644
  }
  
  // Draw game (one frame)
+diff --git a/raylife/src/raylife.c b/raylife/src/raylife.c
+index 18569e6..f2ff680 100644
+--- a/raylife/src/raylife.c
++++ b/raylife/src/raylife.c
+@@ -15,6 +15,9 @@
+ #include <string.h>
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "raymath.h"
+ 
+ //------------------------------------------------------------------------------------------
+@@ -151,6 +154,10 @@ int main(int argc, char **argv) {
+         playMode = 0;
+     }
+ 
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0) printf("%d %s %d %d %.6f %.6f %.6f %.6f %.6f %.6f\n", RltFrame(), playMode? "play" : "draw",
++        generations, aliveCells, generations_interval, camera.zoom, camera.offset.x, camera.offset.y, camera.target.x, camera.target.y);
++
+     BeginDrawing();
+     ClearBackground(BLACK);
+ 

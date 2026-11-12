@@ -8,7 +8,8 @@
 # left out (their `#else` is kept), since the port has no such platforms.
 # Atmos: the lines between `;; [trace]` and `;; [/trace]` are left out, since
 # the trace only serves the comparison with the original. Strings and native
-# literals count as one token each.
+# literals count as one token each, except a block of C between ```, which
+# counts as C.
 
 import re, sys
 
@@ -43,11 +44,16 @@ def c_count(src):
 
 def atm_count(src):
     src = re.sub(r';; \[trace\].*?;; \[/trace\]', '', src, flags=re.S)
-    src = re.sub(r'```.*?```', lambda m: 'NATIVE' + '\n' * m.group(0).count('\n'), src, flags=re.S)
+    # a block of C in a port (```:prelude ... ```) counts as C
+    nl = nt = 0
+    for m in re.finditer(r'```(?::prelude)?(.*?)```', src, flags=re.S):
+        l, t = c_count(m.group(1))
+        nl += l; nt += t
+    src = re.sub(r'```.*?```', lambda m: '\n' * m.group(0).count('\n'), src, flags=re.S)
     src = re.sub(r'(;;;+)\n.*?\n\1', lambda m: '\n' * m.group(0).count('\n'), src, flags=re.S)
     src = re.sub(r';;[^\n]*', '', src)
     lines = [l for l in src.split('\n') if l.strip()]
-    return len(lines), len(A_TOK.findall('\n'.join(lines)))
+    return len(lines) + nl, len(A_TOK.findall('\n'.join(lines))) + nt
 
 L = T = 0
 for f in sys.argv[1:]:
