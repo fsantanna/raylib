@@ -611,3 +611,49 @@ the map, the credits, the result, the GPi mode, the exit.
   140 frames, and the shadows one frame later.
 - The time and the stamina running out are not in a run: they take 18000
   and 10000 frames.
+
+## koala_seasons
+
+Same as the original on its runs `title` (1000 frames: the logo, the title
+and its blink), `summer`, `autumn`, `winter`, `winter_snow`, `spring` (700
+frames each: the title in each season and weather, chosen by the seed),
+`idle` (1600 frames: a game where the koala does nothing, slides down its
+tree and dies; the ending) and `play` (2754 frames, 19 screens: two games
+and their endings). `play` is made by `tst/koala_seasons/gen.sh`, which
+builds a copy of the original with an autopilot (`autopilot.c`) that
+decides the keys from the statics of the game and prints them; replayed as
+input, they give the same games in the original and in the port: jumps,
+kicks, kills, leaves, the wind, spring and autumn, both endings, the
+replay.
+
+Trace: frame, screen, transition, alpha and target; the title (counters,
+bounce, season, offsets, and each particle system: active, spawn and max
+times, count, sums of positions, rotations and alphas); the gameplay (the
+koala, its state and speed, leaves, score, power, killer, the months and
+timers, the scrolls, the clock, the fog, the colors, each kind of entity
+as a mask of slots and sums of positions, the bee, the eagle, the alerts,
+the particle systems, the rays, the speed lines, the leaves and the
+popups); the ending (phase, counters, eased counts, clock, replay, kills
+shown, the color of the button, the leaves).
+
+- **The date.** The C reads the date (`time`) when a game starts: the
+  month and the year. The test mode fixes it in both (the patch of the
+  original does it, the port does the same with `ks_date`); out of it,
+  both read the date.
+- **Init when asked.** The gameplay and the ending are initialized when
+  their transition is asked, under the old screen: the ending loses its
+  kills under the fade to a new game, as the gameplay resets them.
+- **Never reset.** The state of the koala, the flags of the alerts, the
+  counter of the kills of the ending, and many others go from game to
+  game; the second game of `play` starts from them.
+- **The front snow counts for the back.** The back snow advances the
+  counter of the front snow, as in the C.
+- **The drawing changes the state.** The fire of the gameplay moves its
+  animation while it is drawn; the port does it in its drawing too.
+- **Floats.** The C mixes ints, floats and doubles (`TIME_FACTOR` is a
+  double); each operation is rounded where the C rounds it.
+- **Not in a run:** the final form of the koala (it needs 100 leaves, and
+  the autopilot never gathers them), the eagle, summer and winter in play
+  (and so the fire and the ice), the gestures (no run uses the mouse in
+  the gameplay). The port has their code, translated as the rest, not
+  checked.
