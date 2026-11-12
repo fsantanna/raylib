@@ -16,8 +16,8 @@
 
 ;; The logo of raylib: a blinking corner, two bars, two bars, the letters,
 ;; "powered by", and a fade; then the screen `next`. `bars` is called when
-;; the first bars start.
-task Logo (next, bars) {
+;; the first bars start, and `written` 20 frames after the last letter.
+task Logo (next, bars, written) {
     val x, y = (rl.width()//2) - 128, (rl.height()//2) - 128
     var top, left, bottom, right = 16, 16, 16, 16
     ;; the corner blinks: off in the frames 1..9, on in 10..19, and so on
@@ -69,7 +69,9 @@ task Logo (next, bars) {
             set letters += 1
         }
         par :any {
-            await rl.Frames(21)
+            await rl.Frames(20)
+            if written { written() }
+            await :rl.frame
             set powered = true
             await false
         } with {
@@ -91,7 +93,7 @@ task Logo (next, bars) {
             rl.rectangle(x + 240, y + 16, 16, right - 32, rl.fade(rl.BLACK, alpha))
             rl.rectangle(x, y + 240, bottom, 16, rl.fade(rl.BLACK, alpha))
             rl.rectangle((rl.width()//2) - 112, (rl.height()//2) - 112, 224, 224, rl.fade(rl.RAYWHITE, alpha))
-            rl.text(string.sub("raylib", 0, letters - 1), (rl.width()//2) - 44, (rl.height()//2) + 48, 50, rl.fade(rl.BLACK, alpha))
+            rl.text(rl.text_subtext("raylib", 0, letters), (rl.width()//2) - 44, (rl.height()//2) + 48, 50, rl.fade(rl.BLACK, alpha))
             if powered {
                 rl.text("powered by", x, y - 27, 20, rl.fade(rl.DARKGRAY, alpha))
             }
