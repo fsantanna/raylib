@@ -200,3 +200,27 @@ Left in the port for the trace only: `phase`.
 | `.radius`, `.color` | constant | literals |
 
 Left in the port for the trace only: `phase`.
+
+## pang
+
+`pang` has its own frame (its texts are LIGHTGRAY, and a victory freezes
+the game), so it does not use `Classic`.
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control | `Logic` returns `:over`; the main `loop` shows "PRESS [ENTER]" |
+| `pause` | control | `toggle logic(false)`; the balls stop since they move on `:move`, which the logic emits |
+| `victory` | control: the game freezes, still drawn | `Logic` returns `:won`; `Play` then draws "YOU WIN!" over the game until ENTER |
+| `framesCounter`, `lose`, `awake` | control, never read | gone |
+| `shoot[].active` | control: one shot at a time | `shot`, nil when there is none |
+| `shoot[].lifeSpawn` | control: 120 frames of life | **left**: `shot.life` |
+| `bigBalls[]`, `mediumBalls[]`, `smallBalls[]` `.active` | control: alive, or a faded ghost | the two phases of `Ball`; **left**: `pub.on`, which the logic reads |
+| `countmediumBallss`, `countsmallBallss` | control: the next slot, whose parity gives the direction | gone: `#next` |
+| `meteorsDestroyed` | data: the balls gone, 14 for a victory | `destroyed` |
+| `points[]` | drawn: the popups, 5 slots | `popups`, 5 slots, updated after the logic of each frame even in a pause or after the game, as in the C |
+| `player`, `linePosition`, `shoot[].position` | drawn | `player`, `shot` |
+| `shipHeight`, `gravity`, `.radius`, `.points` | constant | `SHIP_H`, `GRAVITY`, literals |
+| `score` | score | `score` |
+
+Left in the port for the trace only: `phase`.

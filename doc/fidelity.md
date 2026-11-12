@@ -280,3 +280,24 @@ drawn, and reset by the next game).
 - **Ghosts.** A destroyed meteor stays drawn, faded, where it was, in its
   place among the others: in the port, a meteor is a task that goes on, as a
   ghost, after it is hit.
+
+## pang
+
+Same as the original on its runs `play` (2093 frames, 27 screens, seed 3:
+eleven balls shot, with their popups, a pause, a ball on the player, an
+ENTER in the frame of the game over, a restart) and `seed5` (905 frames,
+11 screens).
+
+Trace: frame, phase, player, score, balls destroyed, the shot; in the frame
+of a game over, the phase only.
+
+- **No run reaches the victory.** The generator of runs shoots and steps
+  away from the falling balls, but the small ones bounce fast and low, and
+  no seed nor tuning tried got the 14. The victory (the game frozen, "YOU
+  WIN!" over it, ENTER) is ported, but not compared.
+- The second big ball has the speed of the first: `velx` and `vely` are not
+  reset between them, so the loop that draws them does not run again.
+- A big ball bounces at the top with `*= -1.5`; the others with `-1`.
+- The popups rise and fade after the logic of every frame, even in a pause
+  or after the game; the port updates them at the start of the drawing, the
+  first thing after all the logic.

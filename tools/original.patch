@@ -189,6 +189,39 @@ index 408fbe3..b47f471 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/pang.c b/classics/src/pang.c
+index 4482932..e330e7d 100644
+--- a/classics/src/pang.c
++++ b/classics/src/pang.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <math.h>
+ 
+ #if defined(PLATFORM_WEB)
+@@ -541,6 +544,18 @@ void UpdateGame(void)
+ 
+         if (points[z].alpha < 0.0f) points[z].alpha = 0.0f;
+     }
++
++    // Atmos port: trace, one line per frame, after its logic (the phase only
++    // in the frame of a game over: the rest of that frame may still change it)
++    if (RltFrame() > 0)
++    {
++        if (gameOver) printf("%d over\n", RltFrame());
++        else
++        {
++            printf("%d %s %.1f %d %d ", RltFrame(), victory? "won" : (pause? "pause" : "play"), player.position.x, score, meteorsDestroyed);
++            if (shoot[0].active) printf("%.1f\n", shoot[0].position.y); else printf("-\n");
++        }
++    }
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/snake.c b/classics/src/snake.c
 index 144a118..f0c9b3c 100644
 --- a/classics/src/snake.c

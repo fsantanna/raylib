@@ -1,0 +1,269 @@
+;; raylib - classic game: pang
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/pang.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `victory`, `awake`, the `active` flags,
+;; and `lifeSpawn` of the C became tasks, awaits, and a toggle.
+;;
+;; Its pause, game over, and victory differ from the other classics (the
+;; texts are LIGHTGRAY, a victory freezes the game), so it does not use
+;; classic.atm.
+
+include "../raylib.atm"
+
+val W, H    = 800, 450
+val f32     = rl.f32
+val DEG2RAD = f32(f32(3.14159265358979323846) / 180)
+val SHIP_H  = f32(10 / rl.tanf(f32(20*DEG2RAD)))
+val GRAVITY = f32(0.25)
+
+rl.window [title="classic game: pang", width=W, height=H, fps=60]
+
+var player = [x=0, y=0]
+var shot   = nil                ;; [x=, y=, lx=, ly=]: the shot and where it was fired
+var score, destroyed = 0, 0
+var phase  = :play              ;; :play, :pause, :won, or :over (for the trace)
+
+;; The popups of points: 5 slots, as in the C. They rise and fade in every
+;; frame, after its logic, even in a pause or after the game.
+val popups = []
+loop i in 5 {
+    set popups@i = [x=0, y=0, value=0, alpha=0]
+}
+spawn {
+    loop on :rl.draw {
+        loop _,p in popups {
+            if p.alpha > 0 {
+                set p.y -= 2
+                set p.alpha = f32(p.alpha - f32(0.02))
+            }
+            if p.alpha < 0 {
+                set p.alpha = 0
+            }
+        }
+    }
+}
+func popup (x, y, value) {
+    loop _,p in popups {
+        if p.alpha == 0 {
+            set p.x, p.y, p.value, p.alpha = x, y, value, 1
+            break
+        }
+    }
+}
+
+;; A ball: bounces with gravity, when the logic says (`:move`), until it is
+;; hit (`:hit`); then stays drawn, faded, where it was, in its place in the
+;; drawing order.
+task Ball (b, r, points, color, gravity, top) {
+    set pub = b
+    set pub.on = true
+    set pub.r, pub.points = r, points
+    par :any {
+        loop on :move {
+            set b.x = f32(b.x + b.vx)
+            set b.y = f32(b.y + b.vy)
+            if ((b.x + r) >= W) || ((b.x - r) <= 0) {
+                set b.vx = -b.vx
+            }
+            if (b.y - r) <= 0 {
+                set b.vy = f32(b.vy * top)
+            }
+            if (b.y + r) >= H {
+                set b.vy = -b.vy
+                set b.y = H - r
+            }
+            set b.vy = f32(b.vy + gravity)
+        }
+    } with {
+        loop on :rl.draw {
+            rl.circle_v(b.x, b.y, r, color)
+        }
+    } with {
+        await :hit
+    }
+    set pub.on = false
+    val faded = rl.fade(rl.LIGHTGRAY, 0.3)
+    loop on :rl.draw {
+        rl.circle_v(b.x, b.y, r, faded)
+    }
+}
+
+;; The logic of one game: returns :over when a ball touches the player, or
+;; :won when the 14 balls are gone.
+task Logic (game, bigs, mediums, smalls) {
+    val touches = func (pool, c) {
+        loop _,t in pool {
+            until t.pub.on && rl.check_collision_circles(c.x, c.y, 12, t.pub.x, t.pub.y, t.pub.r)
+        }
+    }
+    ;; the shot against the first ball of a pool that it touches; it splits
+    ;; in two of the next pool, if any
+    val hits = func (pool, next, r, points, color, gravity, vy) {
+        loop _,t in pool {
+            val b = t.pub
+            if b.on && ((b.x - b.r) <= shot.lx) && ((b.x + b.r) >= shot.lx) && ((b.y + b.r) >= shot.y) {
+                set shot = nil
+                emit @t :hit
+                set destroyed += 1
+                set score += b.points
+                popup(b.x, b.y, b.points)
+                if next {
+                    loop _ in 2 {
+                        val vx = if (#next % 2) == 0 => -2 => 2
+                        spawn @next Ball([x=b.x, y=b.y, vx=vx, vy=vy], r, points, color, gravity, -1)
+                    }
+                }
+                break
+            }
+        }
+    }
+    loop on :rl.frame {
+        ;; the player
+        if rl.key_down('LEFT')  { set player.x -= 5 }
+        if rl.key_down('RIGHT') { set player.x += 5 }
+        ifs {
+            (player.x + 10) > W => { set player.x = W - 10 }
+            (player.x - 10) < 0 => { set player.x = 10 }
+        }
+        ;; the shot: fired with SPACE, if none is out; lives 120 frames
+        if rl.key_pressed('SPACE') && !shot {
+            set shot = [x=player.x, y=f32(player.y - SHIP_H), lx=player.x, ly=player.y, life=0]
+        }
+        if shot {
+            set shot.life += 1
+            set shot.y -= 5
+            if (shot.x > (W + 2)) || (shot.x < -2) || (shot.y > (H + 2)) || (shot.y < -2) || (shot.life >= 120) {
+                set shot = nil
+            }
+        }
+        ;; a ball on the player ends the game
+        val c = [x=player.x, y=f32(player.y - f32(SHIP_H/2))]
+        if touches(bigs, c) || touches(mediums, c) || touches(smalls, c) {
+            return :over
+        }
+        ;; the balls move
+        emit @game :move
+        ;; the shot against the balls
+        if shot { hits(bigs, mediums, 20, 100, rl.GRAY, f32(GRAVITY + f32(0.12)), 2) }
+        if shot { hits(mediums, smalls, 10, 50, rl.GRAY, f32(GRAVITY + f32(0.25)), -2) }
+        if shot { hits(smalls, nil) }
+        until destroyed == 14, :won
+    }
+}
+
+;; One game: its logic, its looks, its pause; after a victory, the game
+;; stays drawn with "YOU WIN!" until ENTER.
+task Play () {
+    set player = [x=W//2, y=H]
+    set shot, score, destroyed = nil, 0, 0
+    loop _,p in popups {
+        set p.x, p.y, p.value, p.alpha = 0, 0, 0, 0
+    }
+    ;; two big balls; as in the C, the second one keeps the speed of the
+    ;; first, since `velx` and `vely` are not reset between them
+    pin bigs = tasks()
+    pin mediums = tasks()
+    pin smalls = tasks()
+    var vx, vy = 0, 0
+    loop _ in 2 {
+        val x = rl.random(40, W - 40)
+        val y = rl.random(40, H//2)
+        loop {
+            while (vx == 0) || (vy == 0)
+            set vx = rl.random(-2, 2)
+            set vy = rl.random(-2, 2)
+        }
+        spawn @bigs Ball([x=x, y=y, vx=vx, vy=vy], 40, 200, rl.DARKGRAY, GRAVITY, f32(-1.5))
+    }
+    ;; the looks of the player, the shot, the popups, and the score; the
+    ;; balls draw themselves, before them, in their pools
+    spawn {
+        loop on :rl.draw {
+            rl.triangle(player.x, f32(player.y - SHIP_H), f32(player.x - 10), player.y, f32(player.x + 10), player.y, rl.MAROON)
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            if shot {
+                rl.line(shot.lx, shot.ly, shot.x, shot.y, rl.RED)
+            }
+            loop _,p in popups {
+                if p.alpha > 0 {
+                    rl.text(string.format("+%02d", p.value), p.x, p.y, 20, rl.fade(rl.BLUE, p.alpha))
+                }
+            }
+            rl.text(string.format("SCORE: %d", score), 10, 10, 20, rl.LIGHTGRAY)
+        }
+    }
+    pin logic = spawn Logic(task, bigs, mediums, smalls)
+    val r = par :any {
+        await(logic)
+    } with {
+        loop {
+            await :rl.key.dn [name='P']
+            toggle logic(false)
+            set phase = :pause
+            watching :rl.key.dn [name='P'] {
+                val s = "GAME PAUSED"
+                loop on :rl.draw {
+                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.LIGHTGRAY)
+                }
+            }
+            toggle logic(true)
+            set phase = :play
+        }
+    }
+    if r == :won {
+        set phase = :won
+        watching :rl.key.dn [name='ENTER'] {
+            val s1 = "YOU WIN!"
+            val s2 = "PRESS [ENTER] TO PLAY AGAIN"
+            loop on :rl.draw {
+                rl.text(s1, (W//2) - (rl.measure(s1,60)//2), 100, 60, rl.LIGHTGRAY)
+                rl.text(s2, (rl.width()//2) - (rl.measure(s2,20)//2), (rl.height()//2) - 50, 20, rl.LIGHTGRAY)
+            }
+        }
+    }
+    r
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic (in the
+;; frame of a game over, the phase only)
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            if phase == :over {
+                print(string.format("%d %s", rl.frame(), phase))
+            } else {
+                print(string.format("%d %s %.1f %d %d %s", rl.frame(), phase, player.x, score, destroyed,
+                    if shot => string.format("%.1f", shot.y) => "-"))
+            }
+        }
+    }
+}
+;; [/trace]
+
+loop {
+    set phase = :play
+    val r = await Play()
+    if r == :over {
+        set phase = :over
+        watching :rl.key.dn [name='ENTER'] {
+            val s = "PRESS [ENTER] TO PLAY AGAIN"
+            loop on :rl.draw {
+                rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.LIGHTGRAY)
+            }
+        }
+    }
+    await :rl.frame         ;; the frame of ENTER only starts the next game
+}
