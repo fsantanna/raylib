@@ -14,8 +14,8 @@ Seen and expected, as the manual says, listed for whoever writes a port:
   the spawned task.
 - A native literal with a single backquote is one line: longer C goes to
   the `:prelude`.
-- `on` is a keyword, so it cannot be a variable; `next` is a function of
-  the language, so it cannot be redefined.
+- `on`, `catch` and `test` are keywords, so they cannot be variables;
+  `next` is a function of the language, so it cannot be redefined.
 - `??` is the equivalence ("is"), not a default for nil.
 - `watching E until c { B }` checks `c` before `B` runs in the same event
   (the watcher comes first): a body that changes what `c` reads ends one
@@ -24,6 +24,18 @@ Seen and expected, as the manual says, listed for whoever writes a port:
   is one branch needs `par :any`.
 - A `func` inside a task must be `val func`; the parameters of a task are
   constants (copy them to a `var` to move).
+- A table literal cannot be indexed (`[1, 2]@i` does not parse): it goes in
+  a constant first.
+- `await` takes a call that spawns; to await a task computed by an
+  expression, spawn it first (`pin s = spawn (f(x))()`), then `await(s)`.
+- `pin` refuses a value that escapes into a table (`invalid escape :
+  pinned value`): a resource kept in a table is a `val`.
+- `%` is the remainder of C (`fmod`, with the sign of the dividend), not
+  the modulo of Lua; `//` floors.
+- A name that a function declares as a parameter hides a local of the
+  same name in an enclosing task only inside it, but a hook passed in and
+  named as a local of the task (`letters` in `Logo`) is shadowed by the
+  local: give hooks names that the task does not use.
 
 To watch, as the plan asks: the cost of a native call per shape drawn, the
 cost of small records passed to C, an environment that ticks in frames as
