@@ -227,12 +227,14 @@ static const char* RL_KIND_RTX = "rl.render";
 static const char* RL_KIND_FNT = "rl.font";
 static const char* RL_KIND_SND = "rl.sound";
 static const char* RL_KIND_MUS = "rl.music";
+static const char* RL_KIND_SHD = "rl.shader";
 
 static void rl_tex_fin (void* p) { UnloadTexture(*(Texture2D*)p); free(p); }
 static void rl_rtx_fin (void* p) { UnloadRenderTexture(*(RenderTexture2D*)p); free(p); }
 static void rl_fnt_fin (void* p) { UnloadFont(*(Font*)p); free(p); }
 static void rl_snd_fin (void* p) { UnloadSound(*(Sound*)p); free(p); }
 static void rl_mus_fin (void* p) { UnloadMusicStream(*(Music*)p); free(p); }
+static void rl_shd_fin (void* p) { UnloadShader(*(Shader*)p); free(p); }
 
 static AVal rl_box (const void* v, size_t n, void (*fin)(void*), const char* kind) {
     void* p = malloc(n);
@@ -437,7 +439,10 @@ val rl = [
     mouse_pressed = func (b) { `:boolean IsMouseButtonPressed(RL_I($b))` },
     mouse_released = func (b) { `:boolean IsMouseButtonReleased(RL_I($b))` },
     gesture_detected = func (g) { `:boolean IsGestureDetected(RL_I($g))` },
-    GESTURE_TAP = 1,
+    gesture       = func ()  { `:number GetGestureDetected()` },
+    GESTURE_TAP = 1, GESTURE_DOUBLETAP = 2, GESTURE_HOLD = 4, GESTURE_DRAG = 8,
+    touch_x      = func (i) { `:number GetTouchPosition(RL_I($i)).x` },
+    touch_y      = func (i) { `:number GetTouchPosition(RL_I($i)).y` },
     mouse_x      = func ()  { `:number GetMousePosition().x` },
     mouse_y      = func ()  { `:number GetMousePosition().y` },
     mouse_dx     = func ()  { `:number GetMouseDelta().x` },
@@ -610,6 +615,14 @@ val rl = [
     draw_texture_npatch = func (t, sx, sy, sw, sh, l, tp, r, b, x, y, w, h, c) {
         `DrawTextureNPatch(rl_texture($t), (NPatchInfo){ (Rectangle){RL_F($sx),RL_F($sy),RL_F($sw),RL_F($sh)}, RL_I($l), RL_I($tp), RL_I($r), RL_I($b), NPATCH_NINE_PATCH }, (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)}, (Vector2){0,0}, 0.0f, rl_color($c));`
     },
+    ;; Shaders: rl.shader(vs, fs), paths or nil (the default one)
+    shader = func (vs, fs) {
+        `Shader rl_sh = LoadShader(($vs).type==A_NIL ? NULL : rl_s($vs), ($fs).type==A_NIL ? NULL : rl_s($fs));`
+        `:value rl_box(&rl_sh, sizeof(rl_sh), rl_shd_fin, RL_KIND_SHD)`
+    },
+    begin_shader_mode = func (s) { `if (a_nat_is($s, RL_KIND_SHD)) BeginShaderMode(*(Shader*)a_nat_ptr($s));` },
+    end_shader_mode   = func ()  { `EndShaderMode();` },
+
     ;; rl.texture_filter(t, mode): of a texture, a render texture, or a font
     texture_filter = func (t, mode) {
         `if (a_nat_is($t, RL_KIND_FNT)) SetTextureFilter(rl_font($t).texture, RL_I($mode)); else SetTextureFilter(rl_texture($t), RL_I($mode));`
