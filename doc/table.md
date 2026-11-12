@@ -10,6 +10,9 @@
   on all of their trace lines and screens ([fidelity.md](fidelity.md)).
 - **Memory** and **CPU**: in [bench.md](bench.md), once measured.
 
+The rows are written by `tools/table.py`, from the sources, `state.md`, and
+the runs: no number here is typed by hand.
+
 | Game | Lines C | Lines Atmos | Tokens C | Tokens Atmos | Control C | Control left | Runs | Same |
 |------|--------:|------------:|---------:|-------------:|----------:|-------------:|-----:|------|
 | snake | 181 | 121 | 1509 | 911 | 5 | 0 | 2 (1220 frames, 16 screens) | yes |
