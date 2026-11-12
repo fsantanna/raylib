@@ -13,3 +13,4 @@
 | Game | Lines C | Lines Atmos | Tokens C | Tokens Atmos | Control C | Control left | Runs | Same |
 |------|--------:|------------:|---------:|-------------:|----------:|-------------:|-----:|------|
 | snake | 181 | 121 | 1509 | 911 | 5 | 0 | 2 (1220 frames, 16 screens) | yes |
+| floppy | 141 | 112 | 1190 | 905 | 4 | 0 | 2 (2746 frames, 25 screens) | yes |

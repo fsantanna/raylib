@@ -1,0 +1,6 @@
+# SPACE held: floppy leaves the screen at the top, where the C has no wall,
+# and scores every tube it passes over; then it falls back.
+FRAMES=1500
+SEED=7
+INPUT=1:dn:SPACE,900:up:SPACE
+SHOTS="60 160 161 300 301 1000 1500"

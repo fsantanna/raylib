@@ -1,0 +1,152 @@
+;; raylib - classic game: floppy
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/floppy.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `superfx`, and `tubes[].active` of the C
+;; became tasks, awaits, and a toggle.
+
+include "../raylib.atm"
+
+val W, H   = 800, 450
+val RADIUS = 24
+val TUBE_W = 80
+val NTUBES = 100
+
+rl.window [title="classic game: floppy", width=W, height=H, fps=60]
+
+val floppy = [x=0, y=0]         ;; where floppy is
+var score  = 0
+var hiscore = 0
+var phase  = :play              ;; :play, :pause, or :over (for the trace)
+
+;; A pair of tubes: moves left, ends the game when floppy touches it, and
+;; scores once when floppy passes it. As in the C, in each frame the top tube
+;; is checked before the bottom one, and the pairs in their order.
+task Tube (game, x0, y) {
+    var x = x0
+    val ytop = y
+    val ybot = (600 + y) - 255
+    val func hit (yt) {
+        rl.check_collision_circle_rec(floppy.x, floppy.y, RADIUS, x, yt, TUBE_W, 255)
+    }
+    par {
+        ;; ahead of floppy, then behind it
+        loop {
+            await :rl.frame
+            set x -= 2
+            if hit(ytop) { emit @game :over }
+            until x < floppy.x
+            if hit(ybot) { emit @game :over }
+        }
+        emit @game :scored
+        if hit(ybot) { emit @game :over }
+        loop on :rl.frame {
+            set x -= 2
+            if hit(ytop) || hit(ybot) { emit @game :over }
+        }
+    } with {
+        loop on :rl.draw {
+            rl.rectangle(x, ytop, TUBE_W, 255, rl.GRAY)
+            rl.rectangle(x, ybot, TUBE_W, 255, rl.GRAY)
+        }
+    }
+}
+
+;; One game: floppy, the tubes, and the score. Ends when floppy hits a tube.
+task Play () {
+    set floppy.x, floppy.y = 80, (H//2) - RADIUS
+    set score = 0
+    spawn {
+        par {
+            loop on :rl.frame {
+                if rl.key_down('SPACE') {
+                    set floppy.y -= 3
+                } else {
+                    set floppy.y += 1
+                }
+            }
+        } with {
+            loop on :rl.draw {
+                rl.circle(floppy.x, floppy.y, RADIUS, rl.DARKGRAY)
+            }
+        }
+    }
+    pin tubes = tasks()
+    loop i in NTUBES {
+        spawn @tubes Tube(task, 400 + (280*i), -rl.random(0, 120))
+    }
+    spawn {
+        ;; the flash: one frame of white when floppy scores
+        loop {
+            await :scored
+            await :rl.draw
+            rl.rectangle(0, 0, W, H, rl.WHITE)
+        }
+    }
+    spawn {
+        loop on :scored {
+            set score += 100
+            set hiscore = math.max(score, hiscore)
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            rl.text(string.format("%04d", score), 20, 20, 40, rl.GRAY)
+            rl.text(string.format("HI-SCORE: %04d", hiscore), 20, 70, 20, rl.LIGHTGRAY)
+        }
+    }
+    await :over
+}
+
+;; One game, with its pause: P stops the play, which keeps being drawn.
+task Game () {
+    set phase = :play
+    pin play = spawn Play()
+    spawn {
+        loop {
+            await :rl.key.dn [name='P']
+            toggle play(false) with :rl.draw
+            set phase = :pause
+            watching :rl.key.dn [name='P'] {
+                val s = "GAME PAUSED"
+                loop on :rl.draw {
+                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.GRAY)
+                }
+            }
+            toggle play(true)
+            set phase = :play
+        }
+    }
+    await(play)
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %s %.1f %d %d", rl.frame(), phase, floppy.y, score, hiscore))
+        }
+    }
+}
+;; [/trace]
+
+loop {
+    await Game()
+    set phase = :over
+    watching :rl.key.dn [name='ENTER'] {
+        val s = "PRESS [ENTER] TO PLAY AGAIN"
+        loop on :rl.draw {
+            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
+        }
+    }
+    await :rl.frame         ;; the frame of ENTER only starts the next game
+}

@@ -1,3 +1,28 @@
+diff --git a/classics/src/floppy.c b/classics/src/floppy.c
+index 72881fc..f35bc66 100644
+--- a/classics/src/floppy.c
++++ b/classics/src/floppy.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #if defined(PLATFORM_WEB)
+     #include <emscripten/emscripten.h>
+ #endif
+@@ -187,6 +190,10 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0) printf("%d %s %.1f %d %d\n", RltFrame(),
++        gameOver? "over" : (pause? "pause" : "play"), floppy.position.y, score, hiScore);
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/snake.c b/classics/src/snake.c
 index 144a118..f0c9b3c 100644
 --- a/classics/src/snake.c

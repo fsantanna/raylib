@@ -431,6 +431,20 @@ val rl = [
         `:number MeasureText(rl_s($s), RL_I($size))`
     },
 
+    ;; Collisions, as raylib computes them (floats)
+    check_collision_circle_rec = func (cx, cy, r, x, y, w, h) {
+        `:boolean CheckCollisionCircleRec((Vector2){RL_F($cx),RL_F($cy)}, RL_F($r), (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)})`
+    },
+    check_collision_recs = func (x1, y1, w1, h1, x2, y2, w2, h2) {
+        `:boolean CheckCollisionRecs((Rectangle){RL_F($x1),RL_F($y1),RL_F($w1),RL_F($h1)}, (Rectangle){RL_F($x2),RL_F($y2),RL_F($w2),RL_F($h2)})`
+    },
+    check_collision_circles = func (x1, y1, r1, x2, y2, r2) {
+        `:boolean CheckCollisionCircles((Vector2){RL_F($x1),RL_F($y1)}, RL_F($r1), (Vector2){RL_F($x2),RL_F($y2)}, RL_F($r2))`
+    },
+    check_collision_point_rec = func (px, py, x, y, w, h) {
+        `:boolean CheckCollisionPointRec((Vector2){RL_F($px),RL_F($py)}, (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)})`
+    },
+
     ;; rl.KEY.RIGHT: the codes of the keys
     KEY = [
         APOSTROPHE = 39,

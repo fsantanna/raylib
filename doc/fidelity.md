@@ -79,3 +79,23 @@ What can differ, and no run does:
 - Two keys pressed in the same frame. The C reads `P` first, then the
   arrows in a fixed order (RIGHT, LEFT, UP, DOWN). The port handles the key
   events in the order raylib gives them (`GetKeyPressed`).
+
+## floppy
+
+Same as the original on its runs `play` (1246 frames, 18 screens: four tubes,
+a pause, a game over, an ENTER in its frame, a restart, two tubes, a game
+over) and `top` (1500 frames, 7 screens, seed 7: floppy flies over the
+screen, where the C has no wall, and scores ten tubes).
+
+Trace: frame, phase, y of floppy, score, best score.
+
+As in the C:
+
+- In each frame, every pair of tubes moves, then floppy, then the pairs are
+  checked in their order, the top tube before the bottom one: a pair can
+  score and then end the game with its bottom tube in the same frame, and a
+  pair that ends the game stops the pairs after it from scoring. In the
+  port each pair is a task that checks itself; the pairs run in the order
+  they were spawned, and floppy, spawned before them, has already moved.
+- The 100 pairs are drawn and moved in every frame, even far out of the
+  screen.

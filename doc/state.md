@@ -26,3 +26,21 @@ screen) should become an `await`, a block, or a task.
 
 Left in the port for the trace only: `phase` (`:play`, `:pause`, `:over`),
 which the game never reads.
+
+## floppy
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control: tested at the top of `UpdateGame` | the task `Play` ends on `:over`; the main `loop` awaits `Game` |
+| `pause` | control | `toggle play(false) with :rl.draw`: the play stops but is still drawn |
+| `superfx` | control: a flash, set in the update, cleared in the drawing | a task: `await :scored`, then `await :rl.draw`, then one white rectangle |
+| `tubes[].active` | control: a pair still to score | the task `Tube`: a loop until floppy passes it, one `:scored`, then a loop behind it |
+| `tubes[].rec`, `tubesPos[]` | data: two rectangles per pair, and their position | `x`, `ytop`, `ybot`, local to each `Tube` |
+| `tubes[].color` | constant | `rl.GRAY` |
+| `tubesSpeedX` | constant | `2` |
+| `floppy.position` | drawn | `floppy` |
+| `floppy.radius`, `floppy.color` | constant | `RADIUS`, `rl.DARKGRAY` |
+| `score`, `hiScore` | score | `score`, `hiscore` |
+
+Left in the port for the trace only: `phase`.
