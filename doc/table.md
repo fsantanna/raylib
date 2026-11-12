@@ -34,3 +34,5 @@ the runs: no number here is typed by hand.
 | repair | 672 | 376 | 5601 | 3797 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
 | cat_vs_roomba | 857 | 503 | 7312 | 5518 | 5 | 1 | 2 (13420 frames, 31 screens) | yes |
 | light_my_ritual | 901 | 485 | 7087 | 4415 | 5 | 2 | 2 (8700 frames, 34 screens) | yes |
+| transmission | 1125 | 645 | 6898 | 5528 | 6 | 3 | 2 (7036 frames, 37 screens) | yes |
+| drturtle | 293 | 109 | 2416 | 816 | None | None | 0 (0 frames, 0 screens) | no |
