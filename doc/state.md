@@ -322,3 +322,22 @@ in the C: they act while they are drawn.
 | `finishScreen` | control | the screen's `pub` |
 | `player`, `playerBase`, `dating`, `datingBase`, `playerLikes`, `playerBaseLikes`, `matchValue` | data, and drawn | `player`, `player_base`, `dating`, `dating_base`, `likes`, `base`, `m` |
 | `npInfo.source.x` | data: set from the state of each button just before it is drawn | an argument of the drawing |
+
+## cat_vs_roomba
+
+The screens and the logo as in `wave_collector`, with this game's black
+fade (0.02 in and out).
+
+| C | Kind | Port |
+|---|------|------|
+| `state`, `framesCounter`, `vsScale`, `vsAlpha` (title) | control: the cat and the roomba come in, "vs" grows for 160 frames, then the text blinks | a sequence of three loops, and a blink of 30 and 30 |
+| `scrollPositionX` (title, ending) | drawn | `x` |
+| `framesCounter` (ending) | control: a blinking text | a blink of 30 and 30 |
+| `showObjective` | control: the objective until ENTER | `await ... until ENTER`, then the game |
+| `framesCounter`, `timeLevelSeconds`, `levelFinished` (gameplay) | control: a second every 60 frames, 180 of them | the timer: `await rl.Frames(60)` 180 times; `g.time` is drawn |
+| `catShouldMove` | control: the cat walks to where it was sent | **left**: `walking`, since a click while walking changes the target and the arrival is checked in the middle of the frame |
+| `tiles[]` | drawn, and data: a level, a state, and a counter per tile | `tiles`, with the loops of the C |
+| `popup[]` | drawn: 60 slots | `popups`, 60 slots |
+| `roombaPosition`, `catPosition`, `catTargetPosition`, `mouseTileX/Y` | drawn, and data | `g`, `tx`, `ty` |
+| `furset[]`, `furmap[]`, `furnitureCount` | data, read from files; `furnitureCount` is never reset | `furset`, `furmap`, read anew in each game |
+| `score`, `result` | score; never reset, and `result` starts at -1 | `score`, `result`, outside the screens |

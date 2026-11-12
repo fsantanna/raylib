@@ -1,3 +1,49 @@
+diff --git a/cat_vs_roomba/src/cat_vs_roomba.c b/cat_vs_roomba/src/cat_vs_roomba.c
+index 6ba0f5c..dba97bf 100644
+--- a/cat_vs_roomba/src/cat_vs_roomba.c
++++ b/cat_vs_roomba/src/cat_vs_roomba.c
+@@ -13,6 +13,10 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++void TraceGameplay(int f);  // Atmos port: trace (screen_gameplay.c)
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #if defined(PLATFORM_WEB)
+@@ -270,6 +274,13 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        if (currentScreen == GAMEPLAY) TraceGameplay(RltFrame());
++        else printf("%d %d %d\n", RltFrame(), score, result);
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
+diff --git a/cat_vs_roomba/src/screen_gameplay.c b/cat_vs_roomba/src/screen_gameplay.c
+index 5ac74e7..959867e 100644
+--- a/cat_vs_roomba/src/screen_gameplay.c
++++ b/cat_vs_roomba/src/screen_gameplay.c
+@@ -647,4 +647,10 @@ static float GetTileCleanPercent(void)
+     value = ((float)(tileLevelsToClean - tileLevelsCleaned)/tileLevelsToClean)*100.0f;
+ 
+     return value;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the gameplay
++void TraceGameplay(int f)
++{
++    printf("%d %d %d %d %.4f %.4f %.4f %.4f\n", f, score, result, timeLevelSeconds,
++        roombaPosition.x, roombaPosition.y, catPosition.x, catPosition.y);
++}
 diff --git a/classics/src/arkanoid.c b/classics/src/arkanoid.c
 index b5fd3c9..91ee5a0 100644
 --- a/classics/src/arkanoid.c

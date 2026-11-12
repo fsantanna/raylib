@@ -1,0 +1,6 @@
+# The title, ENTER, the objective, ENTER; the roomba with S and A; the cat
+# sent twice; a right click and SPACE (sounds with random choices).
+FRAMES=1400
+SEED=1
+INPUT=750:dn:ENTER,751:up:ENTER,900:dn:ENTER,901:up:ENTER,920:dn:S,980:up:S,980:dn:A,1100:up:A,1000:mv:300:300,1001:md:0,1002:mu:0,1150:mv:120:300,1151:md:0,1152:mu:0,1200:md:1,1201:mu:1,1210:dn:SPACE,1211:up:SPACE
+SHOTS="1 400 600 700 760 830 850 902 950 1002 1100 1152 1250 1400"

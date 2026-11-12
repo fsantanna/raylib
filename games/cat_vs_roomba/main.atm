@@ -1,0 +1,427 @@
+;; Cat vs Roomba (GGJ19), by Ramon Santamaria (@raysan5).
+;; Copyright (c) 2019 Ramon Santamaria (@raysan5), zlib license. The art and
+;; sound are those of the original, credited in README.original.md.
+;;
+;; Ported to Atmos: an altered version of `cat_vs_roomba/src/*.c` of
+;; raysan5/raylib-games. The game is the same; the screens, the transition,
+;; the logo, the title, the objective, the timer, and the cat are tasks and
+;; awaits. The tiles of dirt keep the loops of the C.
+
+include "../../raylib.atm"
+include "../screens.atm"
+
+val W, H = 1280, 720
+val f32  = rl.f32
+val TILE, TX, TY = 36, 32, 17
+val OX, OY = 70, 70                     ;; the room
+
+rl.window [title="CAT VS ROOMBA [GGJ19]", width=W, height=H, fps=60]
+rl.audio_init()
+pin font  = rl.font("resources/star.fnt")
+pin font2 = rl.font("resources/star2.fnt")
+pin music = rl.music("resources/cat_mouse.mod")
+pin coin  = rl.sound("resources/coin.wav")
+rl.music_volume(music, 1)
+rl.play_music(music)
+val FS, FS2 = rl.font_size(font), rl.font_size(font2)
+
+var score  = 0                          ;; never reset, as in the C
+var result = -1                         ;; 0 lose, 1 win (-1 before the first game)
+
+;; the stripes that scroll behind the title and the end
+func stripes (x) {
+    loop i in (64*2*2) {
+        rl.rectangle((64*i) + x, 0, 64, H, if (i % 2) == 0 => 0xf3726dff => 0xffcf6bff)
+    }
+}
+func scroll (x) {
+    val n = x - 5
+    if n < -W => 0 => n
+}
+
+task LogoScreen () {
+    pin l = spawn Logo(:title, nil)
+    await :rl.frame until l.pub
+    set pub = l.pub
+    await false
+}
+
+task Title () {
+    pin tcat    = rl.texture("resources/title_cat.png")
+    pin tvs     = rl.texture("resources/title_vs.png")
+    pin troomba = rl.texture("resources/title_roomba.png")
+    rl.play_music(music)
+    var x, cx, rx = 0, 1760, -700
+    var vs = nil                        ;; [scale=, alpha=] once both are in
+    spawn {
+        loop on :rl.frame {
+            set x = scroll(x)
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            stripes(x)
+            rl.draw_texture(tcat, cx, 80, rl.WHITE)
+            rl.draw_texture(troomba, rx, 320, rl.WHITE)
+            if vs {
+                val w, h = rl.texture_width(tvs), rl.texture_height(tvs)
+                rl.draw_texture_pro(tvs, 0, 0, w, h, W//2, 300, f32(w*vs.scale), f32(h*vs.scale),
+                    f32((w//2)*vs.scale), f32((h//2)*vs.scale), 0, rl.fade(rl.WHITE, vs.alpha))
+            }
+        }
+    }
+    spawn {
+        ;; the cat and the roomba come in; "vs" grows in; the text blinks
+        val cend, rend = (W//2) - (rl.texture_width(tcat)//2), (W//2) - (rl.texture_width(troomba)//2)
+        loop on :rl.frame {
+            set cx, rx = math.max(cx - 4, cend), math.min(rx + 3, rend)
+            until (cx == cend) && (rx == rend)
+        }
+        set vs = [scale=10, alpha=0]
+        loop _ in 161 {
+            await :rl.frame
+            set vs.scale = math.max(f32(vs.scale - f32(0.1)), 1)
+            set vs.alpha = math.min(f32(vs.alpha + f32(0.01)), 1)
+        }
+        await rl.Frames(30)
+        loop {
+            watching rl.Frames(30) {
+                loop on :rl.draw {
+                    rl.text_ex(font2, "PRESS ENTER to START", 340, 550, FS2, 2, rl.WHITE)
+                }
+            }
+            await rl.Frames(30)
+        }
+    }
+    await :rl.frame until rl.key_pressed('ENTER') || rl.gesture_detected(rl.GESTURE_TAP)
+    rl.play_sound(coin)
+    set pub = :gameplay
+    await false
+}
+
+task Ending () {
+    rl.play_music(music)
+    var x = 0
+    spawn {
+        loop on :rl.frame {
+            set x = scroll(x)
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            stripes(x)
+            if result == 0 {
+                rl.text_ex(font2, "YOU LOOSE...", 350, 200, FS2*2, 2, rl.WHITE)
+            } else {
+                rl.text_ex(font, "YOU WIN!!!", 380, 200, FS*2, 2, rl.WHITE)
+            }
+            rl.text_ex(font, string.format("FINAL SCORE: %d", score), 400, 360, FS2, 2, rl.WHITE)
+        }
+    }
+    spawn {
+        await rl.Frames(30)
+        loop {
+            watching rl.Frames(30) {
+                loop on :rl.draw {
+                    rl.text_ex(font2, "PRESS ENTER to TITLE", 340, 550, FS2, 2, rl.WHITE)
+                }
+            }
+            await rl.Frames(30)
+        }
+    }
+    await :rl.frame until rl.key_pressed('ENTER') || rl.gesture_detected(rl.GESTURE_TAP)
+    rl.play_sound(coin)
+    set pub = :title
+    await false
+}
+
+;; Where the furniture can be: 0 none, 1 floor, 2 under furniture, 3 a sofa
+;; (the cat dirties around it).
+val COLMAP = [
+    1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,3,3,1,1,1,0,0,1,1,1,1,1,1,1,1,
+    1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,3,3,1,1,1,0,0,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    0,0,1,1,1,1,2,2,2,1,1,1,0,0,1,1,1,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,
+    0,0,1,1,1,1,2,2,2,1,1,1,0,0,1,1,1,2,2,2,1,1,1,1,3,3,1,1,1,1,0,0,
+    3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,1,1,1,3,3,1,1,1,1,0,0,
+    3,3,1,1,2,2,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,1,1,1,0,0,0,0,0,0,0,0,
+    1,1,1,1,2,2,2,2,2,2,2,2,1,1,1,1,1,2,2,2,1,1,1,1,0,0,0,0,0,0,0,0,
+    1,1,1,1,2,2,2,2,2,2,2,2,1,1,1,1,1,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,0,0,0,0,0,0,0,0,3,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    1,1,1,1,0,0,0,0,0,0,0,0,3,3,1,1,1,1,1,1,1,0,0,1,2,2,2,2,2,2,1,1,
+    0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,2,2,2,2,2,2,1,1,
+    0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,1,1,
+    0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,1,1,
+    0,0,0,0,0,0,0,0,0,0,2,2,2,3,3,3,3,1,1,0,0,1,2,2,2,2,2,2,2,2,0,0,
+    0,0,0,0,0,0,0,0,0,0,2,2,2,3,3,3,3,1,1,0,0,1,2,2,2,2,2,2,2,2,0,0,
+]
+
+;; The lines "f a b c d e" of a file of furniture.
+func furniture_file (path) {
+    val out = []
+    loop l in io.lines(path) {
+        if string.sub(l, 0, 0) == "f" {
+            val p = string.split(l)
+            vector.insert(out, [tonumber(p@1), tonumber(p@2), tonumber(p@3), tonumber(p@4), tonumber(p@5)])
+        }
+    }
+    out
+}
+
+;; A level of dirt for a tile: 50% clean, 20% 1, 20% 2, 10% 3; as in the
+;; C, a draw of 100 matches none of these, and the tile keeps `old`.
+func dirt (old) {
+    val d = rl.random(0, 100)
+    ifs {
+        d < 50  => 0
+        d < 70  => 1
+        d < 90  => 2
+        d < 100 => 3
+        else    => old
+    }
+}
+
+var game = nil                          ;; for the trace
+
+task Gameplay () {
+    pin troomba = rl.texture("resources/roomba.png")
+    pin tcat    = rl.texture("resources/cat.png")
+    pin tdirt   = rl.texture("resources/dirtiles.png")
+    pin tfur    = rl.texture("resources/furniture.png")
+    val furset = furniture_file("resources/furset.txt")
+    loop _,f in furset {
+        set f@1, f@2, f@3, f@4 = (f@1)*TILE, (f@2)*TILE, (f@3)*TILE, (f@4)*TILE
+    }
+    print(string.format("Furniture SET elements read: %d", #furset))
+    val furmap = furniture_file("resources/furmap.txt")
+    print(string.format("Furniture MAP elements read: %d", #furmap))
+    val tiles = []
+    loop y in TY {
+        loop x in TX {
+            val c = COLMAP@((y*TX) + x)
+            val level = if (c != 0) && (c != 3) => dirt(0) => 0
+            vector.insert(tiles, [x=OX + (TILE*x), y=OY + (TILE*y), level=level, state=level, counter=if level == 0 => 0 => 2])
+        }
+    }
+    val popups = []
+    loop i in 60 {
+        set popups@i = [x=0, y=0, value=100, alpha=1, on=false]
+    }
+    pin fxcat1   = rl.sound("resources/fxcat01.wav")
+    pin fxcat2   = rl.sound("resources/fxcat02.wav")
+    pin fxrobot1 = rl.sound("resources/fxrobot01.wav")
+    pin fxrobot2 = rl.sound("resources/fxrobot02.wav")
+    pin fxrobot3 = rl.sound("resources/fxrobot03.wav")
+    pin chase    = rl.music("resources/catch22.mod")
+    rl.stop_music(music)
+    rl.music_volume(chase, 0.6)
+    rl.play_music(chase)
+    defer {
+        rl.stop_music(chase)
+    }
+    set result = 0
+    val g = [time=180, rx=100, ry=100, cx=(30*TILE) + OX, cy=TILE + OY, mx=-1, my=-1]
+    set game = g
+    defer {
+        set game = nil
+    }
+
+    val percent = func () {
+        var total, left = 0, 0
+        loop _,t in tiles {
+            if t.level > 0 {
+                set total += t.level
+                set left += t.state
+            }
+        }
+        f32(f32((total - left) / f32(total)) * 100)
+    }
+
+    ;; the looks
+    var objective = true
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle(0, 0, W, H, 0x57374cff)
+            loop _,t in tiles {
+                rl.draw_texture_rec(tdirt, t.state*TILE, 0, TILE, TILE, t.x, t.y, rl.WHITE)
+            }
+            val f30, f29 = furset@30, furset@29
+            rl.draw_texture_rec(tfur, f30@1, f30@2, f30@3, f30@4, OX, OY, rl.WHITE)
+            rl.draw_texture_rec(tfur, f29@1, f29@2, f29@3, f29@4, OX + (29*36), OY, rl.WHITE)
+            val rw, rh = rl.texture_width(troomba), rl.texture_height(troomba)
+            rl.draw_texture(troomba, g.rx - (rw//2), g.ry - (rh//2), rl.WHITE)
+            rl.draw_texture(tcat, g.cx - (rl.texture_width(tcat)//2), (g.cy - (rl.texture_height(tcat)//2)) - 10, rl.WHITE)
+            loop _,m in furmap {
+                val f = furset@(m@0)
+                val x, y = OX + ((m@1)*TILE), OY + ((m@2)*TILE)
+                val near = rl.check_collision_circle_rec(g.rx - (rw//2), g.ry - (rh//2), rw, x, y, f@3, f@4) && ((m@3) == 1)
+                rl.draw_texture_rec(tfur, f@1, f@2, f@3, f@4, x, y, rl.fade(rl.WHITE, if near => 0.5 => 1))
+            }
+            rl.text_ex(font2, "SCORE:", 80, 10, FS2, 2, rl.WHITE)
+            rl.text_ex(font, string.format("%d", score), 260, 10, FS, 2, rl.WHITE)
+            rl.text_ex(font2, "CLEAN:", 500, 10, FS2, 2, rl.WHITE)
+            rl.text_ex(font, string.format("%.2f%%", percent()), 690, 10, FS, 2, rl.WHITE)
+            rl.text_ex(font2, "TIME:", 950, 10, FS2, 2, rl.WHITE)
+            rl.text_ex(font, string.format("%d:%02ds", g.time//60, g.time%60), 1100, 10, FS, 2, rl.WHITE)
+            if (g.my >= 0) && (g.my < TY) && (g.mx >= 0) && (g.mx < TX) {
+                val t = tiles@((g.my*TX) + g.mx)
+                rl.rectangle_lines_ex(t.x, t.y, TILE, TILE, 2, rl.RED)
+            }
+            loop _,p in popups {
+                if p.on {
+                    rl.text(string.format("+%d", p.value), p.x, p.y, 20, rl.fade(rl.RED, p.alpha))
+                }
+            }
+            if objective {
+                rl.rectangle(0, 150, W, H - 300, rl.fade(rl.DARKGRAY, 0.7))
+                rl.text_ex(font2, "OBJECTIVE:", 500, 240, FS2, 2, rl.WHITE)
+                rl.text_ex(font, "CLEAN 80% OF THE ROOM", 300, 320, FS, 2, rl.WHITE)
+            }
+        }
+    }
+
+    ;; the objective, until ENTER
+    await :rl.frame until rl.key_pressed('ENTER')
+    rl.play_sound(coin)
+    set objective = false
+
+    ;; the timer: a second every 60 frames, first in each frame
+    spawn {
+        loop _ in 180 {
+            await rl.Frames(60)
+            set g.time -= 1
+        }
+        rl.play_sound(coin)
+        if percent() >= 80 {
+            set result = 1
+        }
+        set pub = :ending
+    }
+    ;; the roomba, the tiles, the popups, the clicks, the sounds
+    var walking = false
+    var tx, ty = 0, 0                   ;; where the cat goes
+    loop on :rl.frame {
+        val mx, my = rl.mouse_x(), rl.mouse_y()
+        set g.mx = math.floor(f32(f32(mx - OX) / TILE))
+        set g.my = math.floor(f32(f32(my - OY) / TILE))
+        val px, py = g.rx, g.ry
+        ifs {
+            rl.key_down('D') => { set g.rx += 4 }
+            rl.key_down('A') => { set g.rx -= 4 }
+        }
+        ifs {
+            rl.key_down('W') => { set g.ry -= 4 }
+            rl.key_down('S') => { set g.ry += 4 }
+        }
+        val rw, rh = rl.texture_width(troomba), rl.texture_height(troomba)
+        val rtx, rty = math.floor(math.floor(g.rx - OX) / TILE), math.floor(math.floor(g.ry - OY) / TILE)
+        val c = COLMAP@((rty*TX) + rtx)
+        if ((g.rx - (rw//2)) < OX) || ((g.rx + (rw//2)) >= (OX + (TX*TILE))) ||
+           ((g.ry - (rh//2)) < OY) || ((g.ry + (rh//2)) >= (OY + (TY*TILE))) || (c == 0) || (c == 3) {
+            set g.rx, g.ry = px, py
+        }
+        loop _,t in tiles {
+            if t.state > 0 {
+                val _x, _y, w, h = rl.collision_rec(t.x, t.y, 36, 36, g.rx - (rw//2), g.ry - (rh//2), rw, rh)
+                if f32(w*h) > (28*28) {
+                    set t.counter -= 1
+                    if t.counter < 0 {
+                        set t.state -= 1
+                        if t.state == 0 {
+                            set t.counter = 0
+                            set score += t.level*100
+                            loop _,p in popups {
+                                if !p.on {
+                                    set p.x, p.y, p.value, p.on, p.alpha = t.x, t.y, 100*t.level, true, 1
+                                    break
+                                }
+                            }
+                        } else {
+                            set t.counter = 2
+                        }
+                    }
+                }
+            }
+        }
+        loop _,p in popups {
+            if p.on {
+                set p.y -= 2
+                set p.alpha = f32(p.alpha - f32(0.015))
+                if p.alpha < 0 {
+                    set p.on = false
+                }
+            }
+        }
+        if rl.mouse_pressed(0) {
+            if (mx > OX) && (mx < (OX + (TX*TILE))) && (my > OY) && (my < (OY + (TY*TILE))) && (COLMAP@((g.my*TX) + g.mx) != 0) {
+                set tx, ty, walking = mx, my, true
+            }
+        }
+        if rl.mouse_pressed(1) {
+            rl.play_sound(if rl.random(0, 1) == 0 => fxcat1 => fxcat2)
+        }
+        if rl.key_pressed('SPACE') {
+            val r = rl.random(0, 2)
+            rl.play_sound(ifs {
+                r == 0 => fxrobot1
+                r == 1 => fxrobot2
+                else   => fxrobot3
+            })
+        }
+        ;; the cat walks to where it was sent; on a sofa, it dirties around
+        if walking {
+            if rl.check_collision_point_circle(g.cx, g.cy, tx, ty, 3) {
+                set walking = false
+                val ctx = math.floor(f32(f32(f32(g.cx - (rl.texture_width(tcat)//2)) - OX) / TILE)) + 1
+                val cty = math.floor(f32(f32(f32(f32(g.cy - (rl.texture_height(tcat)//2)) - 10) - OY) / TILE)) + 1
+                if COLMAP@((g.my*TX) + g.mx) == 3 {
+                    loop y in (cty - 2, cty + 2) {
+                        loop x in (ctx - 2, ctx + 2) {
+                            if (y >= 0) && (y < TY) && (x >= 0) && (x < TX) {
+                                val t = tiles@((y*TX) + x)
+                                val cc = COLMAP@((y*TX) + x)
+                                if (t.state == 0) && (cc != 0) && (cc != 3) {
+                                    set t.level = dirt(t.level)
+                                    set t.state = t.level
+                                    set t.counter = if t.level == 0 => 0 => 2
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                val nx, ny = rl.normalize(f32(tx - g.cx), f32(ty - g.cy))
+                set g.cx = f32(g.cx + f32(3*nx))
+                set g.cy = f32(g.cy + f32(3*ny))
+            }
+        }
+    }
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            if game {
+                print(string.format("%d %d %d %d %.4f %.4f %.4f %.4f", rl.frame(), score, result, game.time, game.rx, game.ry, game.cx, game.cy))
+            } else {
+                print(string.format("%d %d %d", rl.frame(), score, result))
+            }
+        }
+    }
+}
+;; [/trace]
+
+val FADE = [
+    color = rl.BLACK,
+    inc = f32(0.02), into = \{ it > f32(1.01) },
+    dec = f32(0.02), back = \{ it < f32(-0.01) },
+]
+await Screens([logo=LogoScreen, title=Title, gameplay=Gameplay, ending=Ending], :logo, FADE)

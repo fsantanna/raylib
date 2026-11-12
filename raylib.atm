@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "raylib.h"
+#include "raymath.h"
 
 int RltFrame (void) __attribute__((weak));
 
@@ -490,6 +491,9 @@ val rl = [
     rectangle_v = func (x, y, w, h, c) {
         `DrawRectangleV((Vector2){RL_F($x),RL_F($y)}, (Vector2){RL_F($w),RL_F($h)}, rl_color($c));`
     },
+    rectangle_lines_ex = func (x, y, w, h, thick, c) {
+        `DrawRectangleLinesEx((Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)}, RL_F($thick), rl_color($c));`
+    },
     rectangle_lines = func (x, y, w, h, c) {
         `DrawRectangleLines(RL_I($x), RL_I($y), RL_I($w), RL_I($h), rl_color($c));`
     },
@@ -517,6 +521,16 @@ val rl = [
     },
     check_collision_point_circle = func (px, py, cx, cy, r) {
         `:boolean CheckCollisionPointCircle((Vector2){RL_F($px),RL_F($py)}, (Vector2){RL_F($cx),RL_F($cy)}, RL_F($r))`
+    },
+    ;; rl.collision_rec(x1,y1,w1,h1, x2,y2,w2,h2): x, y, w, h of the overlap
+    collision_rec = func (x1, y1, w1, h1, x2, y2, w2, h2) {
+        `Rectangle rl_cr = GetCollisionRec((Rectangle){RL_F($x1),RL_F($y1),RL_F($w1),RL_F($h1)}, (Rectangle){RL_F($x2),RL_F($y2),RL_F($w2),RL_F($h2)});`
+        return `:number rl_cr.x`, `:number rl_cr.y`, `:number rl_cr.width`, `:number rl_cr.height`
+    },
+    ;; rl.normalize(x, y): Vector2Normalize, on floats
+    normalize = func (x, y) {
+        `Vector2 rl_n = Vector2Normalize((Vector2){RL_F($x),RL_F($y)});`
+        return `:number rl_n.x`, `:number rl_n.y`
     },
     check_collision_point_rec = func (px, py, x, y, w, h) {
         `:boolean CheckCollisionPointRec((Vector2){RL_F($px),RL_F($py)}, (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)})`

@@ -428,3 +428,25 @@ are drawn.
   nothing; the port keeps it.
 - The counter of the title is never reset: on a second visit its button
   shows at once.
+
+## cat_vs_roomba
+
+Runs: `start` (1400 frames, 14 screens: the title, the objective, the
+roomba, the cat sent twice, the sounds) and `play` (the 180 seconds of a
+game: the roomba sweeps the room, the cat goes seven times, once to a sofa;
+the ending and the title).
+
+Trace: frame, score, result; in the game also the time, the roomba, the
+cat. The C prints two lines when a game starts ("Furniture SET elements
+read: 31", "Furniture MAP elements read: 25"), and so does the port.
+
+- **A draw of 100.** `GetRandomValue(0, 100)` may give 100, which none of
+  the cases of the dirt (`< 50`, `< 70`, `< 90`, `< 100`) takes: the tile
+  keeps the level it had. A first version made it 3, and some tiles
+  differed in the first screen of the game.
+- **A second game** overflows `furmap` in the C: `furnitureCount` is never
+  reset, and 25 more pieces go into 40 slots. The port reads the furniture
+  anew in each game; no run plays two games. The tiles of the C also keep
+  their level from the last game where a draw of 100 leaves them.
+- **No win.** The runs do not clean 80% of the room (that needs a path
+  around the furniture); the ending they show is the loss.
