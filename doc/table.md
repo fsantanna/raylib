@@ -30,10 +30,10 @@ the runs: no number here is typed by hand.
 | platformer | 466 | 170 | 3277 | 1767 | 4 | 0 | 2 (1634 frames, 43 screens) | yes |
 | tetris | 577 | 341 | 4370 | 2894 | 11 | 2 | 2 (10000 frames, 26 screens) | yes |
 | raylife | 196 | 181 | 1506 | 1413 | 1 | 1 | 2 (1400 frames, 33 screens) | yes |
-| wave_collector | 679 | 414 | 4998 | 3685 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
-| repair | 672 | 378 | 5601 | 3808 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
-| cat_vs_roomba | 857 | 505 | 7312 | 5529 | 5 | 1 | 2 (13420 frames, 31 screens) | yes |
-| light_my_ritual | 901 | 487 | 7087 | 4426 | 5 | 2 | 2 (8700 frames, 34 screens) | yes |
-| transmission | 1125 | 647 | 6898 | 5539 | 6 | 3 | 2 (7036 frames, 37 screens) | yes |
+| wave_collector | 679 | 414 | 4998 | 3683 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
+| repair | 672 | 378 | 5601 | 3806 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
+| cat_vs_roomba | 857 | 505 | 7312 | 5527 | 5 | 1 | 2 (13420 frames, 31 screens) | yes |
+| light_my_ritual | 901 | 487 | 7087 | 4424 | 5 | 2 | 2 (8700 frames, 34 screens) | yes |
+| transmission | 1125 | 647 | 6898 | 5537 | 6 | 3 | 2 (7036 frames, 37 screens) | yes |
 | drturtle | 293 | 222 | 2416 | 1891 | 4 | 1 | 2 (3700 frames, 17 screens) | yes |
-| just_do | 1454 | 688 | 9350 | 6445 | None | None | 1 (900 frames, 12 screens) | no |
+| just_do | 1454 | 700 | 9350 | 6490 | 5 | 4 | 2 (4801 frames, 47 screens) | no |

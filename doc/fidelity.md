@@ -516,3 +516,31 @@ and the best score and distance.
   never that of the slot before; the port keeps the slots.
 - The floats of the C (`enemySpeed`, `seaScrolling -= enemySpeed - 2`,
   the blue of the sea from `sinf`) are computed in 32 bits.
+
+## just_do
+
+Same as the original on its runs `start` (1200 frames, 21 screens: the
+logo; the keys 5, 5 again, 9, 1, 0) and `play` (3601 frames, 26
+screens: the ten levels solved, and level 00 again, done since the first
+visit). `play` is made by `tst/just_do/gen.py`, which runs the original
+and reads its trace to plan the clicks of each level: the start of each
+level, the ball of level 02, and the blocks of level 06.
+
+Trace: frame, screen, transition, its alpha and target; then the state of
+the current level (positions, flags, colors, the time of done).
+
+- **Init when asked.** A transition inits the next level at once, under
+  the old screen, which goes on being drawn: the key of the level shown
+  resets it under the fade (the run `start` does it in level 05).
+- **The key 9** inits level 08 and goes to level 09: a level 09 never
+  initialized has the zeros of its statics (no box, no color), as in the
+  C; the port starts its statics at zero for this.
+- **Done stays done.** The flags of done are never reset: a second visit
+  skips the play, and waits 30 or 45 frames (the C counts twice per frame)
+  before a click; level 00 is drawn with its U where init puts it, above
+  the screen.
+- **The clock of level 09** goes on after done, as in the C.
+- **The logo** of `screens.atm` showed the whole word "raylib" in the 12
+  frames before its first letter (`string.sub` with a length of 0); this
+  port found it, and it now uses `TextSubtext`, as the C. No stored run of
+  the earlier games has a screen in those frames.

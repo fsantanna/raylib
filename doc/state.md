@@ -400,3 +400,25 @@ transition and no logo.
 | `hiscore`, `hidistance` | drawn; never reset | `hiscore`, `hidistance` |
 | `backScrolling`, `seaScrolling` | drawn; never reset | `back`, `front` |
 | `blue`, `timeCounter` | drawn | `blue`, `time`, in the task of the background |
+
+## just_do
+
+Ten levels and the logo of `screens.atm`. The transition is the one of
+the C (0.02 in and out, over RAYWHITE), with the keys 0 to 9, which
+jump to a level from any screen; it is written in the game, not with
+`Screens`, because the C inits the next level when the transition is
+asked, under the old screen (a level that jumps to itself is drawn
+reset under the fade).
+
+| C | Kind | Port |
+|---|------|------|
+| `currentScreen` | control | the loop of the screens: `pin s = spawn ...` per screen; **left**: `current`, the number of the screen, which the keys and the trace read |
+| `onTransition`, `transFadeOut`, `transAlpha`, `transToScreen`, `transFromScreen` | control: a fade in, the change, a fade out | two loops in sequence, the old screen toggled off but drawn, then the new one; **left**: `trans` and `to` (the keys are ignored during a transition, and the trace prints them), `alpha` |
+| `framesCounter` (global) | unused | gone |
+| `finishScreen` (each screen) | control: the screen is over | `pub` of the screen |
+| `done`, `levelFinished` (each level) | control: the level is solved; never reset, so a level done stays done | the task `Level`: the play phase, then the wait; **left**: `L.done`, in the statics of the level, which a second visit reads to skip the play |
+| `framesCounter` (each level) | data: the time to solve (`levelTimeSec`); control: the wait of 30 or 90 frames before a click goes on (counted twice per frame but in level 00) | `L.frames` for the time (init resets it, as the C); the wait is `await rl.Frames(...)` |
+| `levelTimeSec` | drawn | `L.secs` |
+| the statics of each level | data; some reset by init, some never (`innerCircleRadius`, `moveSpeed`, `resetCounter`, the hover flags) | a table per level, `L00` to `L09`, and `init00` to `init09` |
+| `resetCounter`, `enableCounter` (level 09) | control: the clock of the chain of clicks, which goes on after done | **left**: `L09.reset`, `L09.enable`; the clock is the hook `always` of the level |
+| the logo: `state`, `framesCounter`, `lettersCount`, `alpha` | control | `Logo` of `screens.atm`, with a hook for the sound 20 frames after the letters |
