@@ -39,3 +39,4 @@ the runs: no number here is typed by hand.
 | just_do | 1454 | 707 | 9350 | 6548 | 5 | 4 | 2 (4801 frames, 47 screens) | yes |
 | skully_escape | 2685 | 682 | 18429 | 6161 | 6 | 3 | 3 (11514 frames, 60 screens) | yes |
 | retro_maze_3d | 497 | 433 | 4185 | 3336 | 5 | 4 | 3 (7092 frames, 58 screens) | yes |
+| koala_seasons | 4689 | 2766 | 46792 | 33111 | 8 | 6 | 8 (8854 frames, 62 screens) | yes |
