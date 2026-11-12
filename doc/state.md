@@ -381,3 +381,22 @@ of raylib.
 | `words[]` (`picked`, `hover`, `rec`) | data: drag and drop | `words` |
 | `messageWords[]`, the missions, the atlas, the headline | data, built from files and images | the C of the original, in the prelude |
 | `currentMission`, `fadeButton` | data; never reset | `mission`, `button_fade` |
+
+## drturtle
+
+The final version of the game (`06_drturtle_final.c`): one file, with no
+transition and no logo.
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight`, `MAX_ENEMIES` | constant | `W`, `H`, `N` |
+| `currentScreen` | control: TITLE, GAMEPLAY, ENDING | the tasks `Title`, `Gameplay`, `Ending`, in sequence and in a loop; the trace keeps a number, `screen` |
+| `framesCounter` (title, ending) | control: the blink of "PRESS ENTER" | the task `Blink`: 30 frames off, 30 on |
+| `framesCounter` (gameplay) | control: an enemy every 41 frames | `await rl.Frames(41)` in a loop of `Gameplay` |
+| `gameraMode` | control: the mode, which the drawing of every screen reads | **left**: `gameraMode`; it changes in the middle of the loop over the enemies (a fish turns it on), and the slots after it see it in the same frame |
+| `enemyActive[]`, `enemyType[]`, `enemyRail[]`, `enemyBounds[]` | data: slots; an enemy takes the first free one, and its rail is never that of the slot before it | `game.enemies`, the same slots |
+| `playerRail`, `playerBounds` | drawn | `game.rail`; the rectangle is computed from it |
+| `score`, `distance`, `foodBar`, `enemySpeed` | drawn, data | `game.score`, `game.distance`, `game.food`, `game.speed` |
+| `hiscore`, `hidistance` | drawn; never reset | `hiscore`, `hidistance` |
+| `backScrolling`, `seaScrolling` | drawn; never reset | `back`, `front` |
+| `blue`, `timeCounter` | drawn | `blue`, `time`, in the task of the background |
