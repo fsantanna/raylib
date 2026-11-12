@@ -30,5 +30,7 @@ the runs: no number here is typed by hand.
 | platformer | 466 | 170 | 3277 | 1767 | 4 | 0 | 2 (1634 frames, 43 screens) | yes |
 | tetris | 577 | 341 | 4370 | 2894 | 11 | 2 | 2 (10000 frames, 26 screens) | yes |
 | raylife | 196 | 181 | 1506 | 1413 | 1 | 1 | 2 (1400 frames, 33 screens) | yes |
-| wave_collector | 679 | 408 | 4998 | 3651 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
-| repair | 672 | 372 | 5601 | 3774 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
+| wave_collector | 679 | 412 | 4998 | 3674 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
+| repair | 672 | 376 | 5601 | 3797 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |
+| cat_vs_roomba | 857 | 503 | 7312 | 5518 | 5 | 1 | 2 (13420 frames, 31 screens) | yes |
+| light_my_ritual | 901 | 485 | 7087 | 4415 | None | None | 1 (1600 frames, 14 screens) | no |
