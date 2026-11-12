@@ -1,3 +1,4 @@
 /ext/
 /build/
 *.o
+__pycache__/
