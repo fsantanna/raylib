@@ -1,0 +1,7 @@
+# The logo of raylib, the logo of the team, the title (its text blinks
+# after 200 frames), ENTER; the attic: its message typed, whole, ENTER,
+# "CHOOSE WISELY!", the play.
+FRAMES=1500
+SEED=1
+INPUT=950:dn:ENTER,951:up:ENTER,1200:dn:ENTER,1201:up:ENTER
+SHOTS="1 140 300 480 500 560 600 700 725 726 727 800 926 930 950 960 975 990 1000 1100 1199 1200 1230 1300 1390 1450 1500"

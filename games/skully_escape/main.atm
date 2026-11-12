@@ -1,0 +1,656 @@
+;; Skully Escape (King Game Jam 2015), by Ramon Santamaria (@raysan5) and the
+;; GRAY TEAM credited in README.original.md. Copyright (c) 2014 Ramon
+;; Santamaria (@raysan5), zlib license. The art and sound are those of the
+;; original.
+;;
+;; Ported to Atmos: an altered version of `skully_escape/src/*.c` of
+;; raysan5/raylib-games. The game is the same: the logos, the title, seven
+;; rooms and the ending. The seven rooms of the C are seven copies of one
+;; file; here they are one task, `Room`, and seven tables of data (doors,
+;; monsters, the message, and the order in which the C goes over them, which
+;; differs from room to room). In a room, the message (typed, then whole,
+;; then "CHOOSE WISELY!", then the play) is a sequence; the search of a
+;; monster, the animation of a monster, the death, and the screens are tasks
+;; and awaits. The player is the module of the C (`player.c`): the rooms
+;; call its update in their play only.
+
+include "../../raylib.atm"
+include "../screens.atm"
+
+val W, H = 1280, 720
+val f32  = rl.f32
+
+rl.window [title="SKULLY ESCAPE [KING GAMEJAM 2015]", width=W, height=H, fps=60]
+rl.audio_init()
+
+pin music  = rl.music("resources/audio/come_play_with_me.ogg")
+rl.play_music(music)
+pin font   = rl.font("resources/textures/alagard.png")
+pin doors  = rl.texture("resources/textures/doors.png")
+pin door   = rl.sound("resources/audio/door.ogg")
+pin scream = rl.sound("resources/audio/scream.ogg")
+val SIZE   = rl.font_size(font)
+
+func int (x) {
+    if x < 0 => math.ceil(x) => math.floor(x)
+}
+func recs (a, b) {
+    rl.check_collision_recs(a.x, a.y, a.w, a.h, b.x, b.y, b.w, b.h)
+}
+func mouse_in (r) {
+    rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), r.x, r.y, r.w, r.h)
+}
+
+;; ---------------------------------------------------------------------------
+;; The player: `player.c`, its functions over its state.
+
+val WALK_RIGHT, WALK_LEFT, SCARE_RIGHT, SCARE_LEFT, SEARCH, FIND_KEY = 1, 2, 3, 4, 5, 6
+pin skully = rl.texture("resources/textures/skully.png")
+pin life   = rl.texture("resources/textures/skully_icon.png")
+val FW, FH = rl.texture_width(skully) // 4, rl.texture_height(skully) // 6
+
+val P = [
+    x=350, y=400, seq=WALK_RIGHT, cf=0, fx=0, fy=0, key=false, lifes=4, dead=false,
+    bounds=[x=0, y=0, w=0, h=0],
+    moving=false, dir=-1, next=0, px=0, py=0, pointer=false, palpha=0,
+    fc=0, out=false, timer=0,
+]
+
+func player_reset () {
+    set P.fx, P.fy = 0, 0
+    set P.cf, P.seq, P.key, P.dead = 0, WALK_RIGHT, false, false
+    if P.x < 400 { set P.x = W - 350 }
+    if P.x > (W - 400) { set P.x = 350 }
+    set P.moving, P.dir, P.next, P.fc, P.out, P.timer = false, -1, 0, 0, false, 0
+    set P.palpha, P.pointer = 0, false
+}
+
+func player_step () {                   ;; the frames of a walk
+    set P.fc += 1
+    if P.fc > 15 {
+        set P.cf += 1
+        set P.fc = 0
+        if P.cf > 3 { set P.cf = 0 }
+    }
+}
+
+func player_update () {
+    if !P.out {
+        if rl.key_down('LEFT') || rl.key_down('RIGHT') {
+            set P.dir, P.moving = -1, false
+        }
+        if rl.key_down('RIGHT') || (P.dir == 0) {
+            set P.seq = WALK_RIGHT
+            player_step()
+            set P.x += 4
+        } else {
+            if rl.key_down('LEFT') || (P.dir == 1) {
+                set P.seq = WALK_LEFT
+                player_step()
+                set P.x -= 4
+            } else {
+                set P.cf = 0
+            }
+        }
+    } else {
+        set P.fc += 1
+        set P.timer += 1
+        if P.fc > 10 {
+            set P.cf += 1
+            set P.fc = 0
+            if P.cf > 3 { set P.cf = 0 }
+            val limit = if P.seq == SCARE_RIGHT => 180 => if P.seq == SCARE_LEFT => 240 => if P.seq >= SEARCH => 240 => nil
+            if limit && (P.timer > limit) {
+                set P.timer, P.out = 0, false
+                set P.seq = if P.seq == SCARE_RIGHT => WALK_LEFT => WALK_RIGHT
+            }
+        }
+    }
+    if P.x < 30 {
+        set P.x = 30
+    } else {
+        if P.x > (W - 200) { set P.x = W - 200 }
+    }
+    if rl.mouse_pressed(0) {
+        set P.px, P.py = rl.mouse_x(), rl.mouse_y()
+        set P.pointer, P.palpha = true, 1
+        set P.next = int(P.px)
+        set P.moving = true
+    }
+    if P.moving {
+        if P.next > (P.x + (FW / 2) + 5) {
+            set P.dir = 0
+        } else {
+            if P.next < (P.x + (FW / 2) - 5) {
+                set P.dir = 1
+            } else {
+                set P.dir, P.moving = -1, false
+            }
+        }
+    }
+    set P.fx = (P.cf * rl.texture_width(skully)) // 4
+    set P.fy = ((P.seq - 1) * rl.texture_height(skully)) // 6
+    set P.bounds = [x=P.x + 50, y=P.y - 60, w=100, h=300]
+    if P.pointer {
+        set P.palpha = f32(P.palpha - f32(0.1))
+        if P.palpha <= 0 {
+            set P.palpha, P.pointer = 0, false
+        }
+    }
+}
+
+func player_scare () {
+    set P.cf = 0
+    set P.seq = if P.dir == 1 => SCARE_LEFT => SCARE_RIGHT
+    set P.lifes -= 1
+    if P.lifes <= 0 { set P.dead = true }
+    set P.out = true
+}
+func player_search () {
+    set P.dir, P.moving, P.cf, P.seq, P.out = -1, false, 0, SEARCH, true
+}
+func player_find () {
+    set P.cf, P.seq, P.key, P.out = 0, FIND_KEY, true, true
+}
+
+func player_draw () {
+    rl.draw_texture_rec(skully, P.fx, P.fy, FW, FH, P.x, P.y, rl.WHITE)
+    if P.pointer {
+        rl.circle_v(P.px, P.py, 20, rl.fade(rl.RED, P.palpha))
+    }
+    loop i in P.lifes {
+        rl.draw_texture(life, 20 + (i * rl.texture_width(life)), H - rl.texture_height(life) - 20, rl.fade(rl.RAYWHITE, 0.7))
+    }
+}
+
+;; ---------------------------------------------------------------------------
+;; The rooms. A door: its position, facing (0 left, 1 center, 2 right) and
+;; the room it leads to. A monster: its texture, position, bounds (as offsets
+;; from its position), and whether it scares (or hides the key). The lists
+;; give the orders of the C: of the doors (`doors`, then `draw_doors`), of
+;; the monsters (`monsters`, the order of the search; `hover`, those that
+;; show the text; `draw`; `choose`, those shown with "CHOOSE WISELY!").
+
+val DW, DH = rl.texture_width(doors) // 3, rl.texture_height(doors) // 2
+
+val ROOMS = [
+    attic = [
+        back = "background_attic", cheat = :aisle01,
+        msg = "YOUR PARENTS ARE GONE! TIME TO ESCAPE!\nTHE DOOR IS LOCKED... TURN ON THE LIGHTS! ;)",
+        doors = [[x=1074, y=140, facing=2, to=:aisle01]], draw_doors = [0],
+        monsters = [
+            [tex="monster_lamp_left", x=50, y=316, b=[20, 0, 90, 380], spooky=false],
+            [tex="monster_arc", x=760, y=430, b=[44, 70, 220, 120], spooky=true],
+        ],
+        hover = [0, 1], draw = [0, 1], choose = [0, 1],
+    ],
+    aisle01 = [
+        back = "background_aisle01", scroll = true,
+        msg = "WHO IS THERE???\nANYBODY IN THE ROOM???",
+        doors = [
+            [x=-30, y=135, facing=0, to=:bathroom],
+            [x=1115, y=104, facing=1, to=:kitchen],
+            [x=1710, y=140, facing=2, to=:livingroom],
+        ],
+        draw_doors = [1, 0, 2],
+        monsters = [
+            [tex="monster_lamp_left", x=187, y=256, b=[20, 0, 90, 380], spooky=true],
+            [tex="monster_picture", x=637, y=178, b=[44, 0, 174, 256], spooky=false],
+        ],
+        hover = [0, 1], draw = [0, 1], choose = [0, 1],
+    ],
+    aisle02 = [
+        back = "background_aisle02", scroll = true,
+        msg = "HAS LEGS BUT CAN NOT WALK...\nSEARCH FOR IT TO OPEN THE DOOR!",
+        doors = [[x=-10, y=136, facing=0, to=:kitchen]], draw_doors = [0],
+        monsters = [
+            [tex="monster_lamp_right", x=1520, y=300, b=[200, 0, 90, 380], spooky=true],
+            [tex="monster_chair_right", x=1400, y=404, b=[50, 30, 120, 190], spooky=false],
+            [tex="monster_picture", x=837, y=162, b=[44, 0, 174, 264], spooky=true],
+            [tex="monster_arc", x=388, y=423, b=[44, 70, 220, 120], spooky=true],
+        ],
+        hover = [0, 1, 2, 3], draw = [0, 3, 2, 1], choose = [0, 3, 1, 2],
+    ],
+    bathroom = [
+        back = "background_bathroom",
+        msg = "TRICK OR TREAT! WHO IS THE MOST BEAUTIFUL\nSKELETON IN THE WORLD?",
+        doors = [[x=1070, y=135, facing=2, to=:aisle01]], draw_doors = [0],
+        monsters = [
+            [tex="monster_lamp_left", x=35, y=334, b=[20, 0, 90, 380], spooky=true],
+            [tex="monster_mirror", x=300, y=200, b=[40, 20, 190, 200], spooky=false],
+            [tex="monster_chair_right", x=760, y=430, b=[30, 30, 120, 190], spooky=true],
+        ],
+        hover = [0, 1, 2], draw = [0, 1, 2], choose = [0, 1, 2],
+    ],
+    livingroom = [
+        back = "background_livingroom",
+        msg = "WHEN WIND BLOWS, IT KNOWS THE DIRECTION\nLET IT GUIDE YOU!",
+        doors = [
+            [x=-45, y=140, facing=0, to=:aisle01],
+            [x=830, y=108, facing=1, to=:aisle02],
+        ],
+        draw_doors = [1, 0],
+        monsters = [
+            [tex="monster_candle", x=154, y=256, b=[90, 30, 185, 340], spooky=false],
+            [tex="monster_picture", x=504, y=164, b=[44, 0, 174, 264], spooky=true],
+            [tex="monster_phone", x=1054, y=404, b=[64, 120, 100, 160], spooky=true],
+        ],
+        hover = [0, 1, 2], draw = [1, 0, 2], choose = [0, 2, 1],
+    ],
+    kitchen = [
+        back = "background_kitchen",
+        msg = "QUITE BORING AROUND...\nANY BETTER ENTERTAINING?",
+        doors = [
+            [x=-45, y=136, facing=0, to=:armory],
+            [x=1090, y=148, facing=2, to=:aisle02],
+        ],
+        draw_doors = [1, 0],
+        monsters = [
+            [tex="monster_closet", x=280, y=260, b=[100, 25, 272, 348], spooky=true],
+            [tex="monster_chair_left", x=230, y=410, b=[30, 60, 100, 160], spooky=true],
+            [tex="monster_window", x=715, y=88, b=[100, 10, 200, 370], spooky=false],
+        ],
+        hover = [0, 2], draw = [0, 1, 2], choose = [0, 2, 1],
+    ],
+    armory = [
+        back = "background_armory",
+        msg = "NO MORE TIPS...\nFOLLOW YOUR INSTINCT!",
+        doors = [
+            [x=-50, y=145, facing=0, to=:ending],
+            [x=1074, y=140, facing=2, to=:kitchen],
+        ],
+        draw_doors = [0, 1],
+        monsters = [
+            [tex="monster_blazon01", x=300, y=260, b=[0, 20, 160, 230], spooky=true],
+            [tex="monster_blazon02", x=550, y=260, b=[0, 20, 160, 230], spooky=true],
+            [tex="monster_blazon03", x=800, y=260, b=[0, 20, 160, 230], spooky=false],
+        ],
+        hover = [0, 1, 2], draw = [0, 1, 2], choose = [0, 1, 2],
+    ],
+]
+loop _,spec in ROOMS {
+    set spec.searching = false          ;; static, never reset by init
+}
+
+var death = false                       ;; the death asks the title
+var game = nil                          ;; the room shown, for the trace
+
+;; A monster found: if it scares, it moves: a frame every 8 (back to frame 1
+;; after the last).
+task Spooky (m) {
+    loop {
+        await rl.Frames(8)
+        set m.cf += 1
+        if m.cf > 3 { set m.cf = 1 }
+    }
+}
+
+task Room (name) {
+    val spec = ROOMS@name
+    player_reset()
+    val R = [frames=0, letters=0, mc=0, check=-1, hover=false, buffer="", playing=false, scroll=0, phase=0]
+    if spec.scroll { set R.scroll = P.x - 200 }
+    pin back = rl.texture("resources/textures/" ++ spec.back ++ ".png")
+    val ds = []
+    loop i,d in spec.doors {
+        set ds@i = [x=d.x, y=d.y, fx=DW * d.facing, fy=DH, locked=true, selected=false, to=d.to,
+                    bound=[x=d.x, y=d.y, w=DW, h=DH]]
+    }
+    val ms = []
+    loop i,m in spec.monsters {
+        val tex = rl.texture("resources/textures/" ++ m.tex ++ ".png")
+        set ms@i = [tex=tex, x=m.x, y=m.y, spooky=m.spooky, active=false, selected=false, cf=0,
+                    fw=rl.texture_width(tex) // 4, fh=rl.texture_height(tex), ox=m.b@0,
+                    bounds=[x=m.x + (m.b@0), y=m.y + (m.b@1), w=m.b@2, h=m.b@3]]
+    }
+    set game = [R=R, ds=ds, ms=ms]
+    defer {
+        set game = nil
+    }
+    pin animations = tasks()
+
+    ;; the room, in the order of the C, but the message
+    spawn {
+        loop on :rl.frame {
+            if death {
+                set death = false
+                set pub = :title
+            }
+            if spec.scroll {
+                loop _,d in ds { set d.bound.x = d.x - R.scroll }
+            }
+            if P.key {
+                loop _,d in ds {
+                    set d.selected = mouse_in(d.bound) || recs(P.bounds, d.bound)
+                    if d.selected && recs(P.bounds, d.bound) {
+                        if (rl.mouse_pressed(0) && mouse_in(d.bound)) || rl.key_pressed('SPACE') {
+                            if d.locked {
+                                set d.fy, d.locked = 0, false
+                                rl.play_sound(door)
+                            } else {
+                                set pub = d.to
+                            }
+                        }
+                    }
+                }
+            }
+            if R.playing {
+                player_update()
+                loop _,m in ms {
+                    set m.fx = (m.cf * rl.texture_width(m.tex)) // 4
+                }
+            }
+            if spec.scroll {
+                loop _,m in ms { set m.bounds.x = m.x + m.ox - R.scroll }
+            }
+            set R.hover = false
+            loop _,i in spec.hover {
+                val m = ms@i
+                if recs(P.bounds, m.bounds) && !m.active { set R.hover = true }
+            }
+            loop i,m in ms {
+                if recs(P.bounds, m.bounds) && !m.active {
+                    set m.selected = true
+                    if rl.key_pressed('SPACE') || (rl.mouse_pressed(0) && mouse_in(m.bounds)) {
+                        player_search()
+                        set spec.searching, R.frames, R.check = true, 0, i + 1
+                    }
+                } else {
+                    set m.selected = false
+                }
+            }
+            if spec.searching {
+                set R.frames += 1
+                if R.frames > 180 {
+                    val m = (R.check > 0) && (ms@(R.check - 1))
+                    if m {
+                        if m.spooky {
+                            player_scare()
+                            rl.play_sound(scream)
+                            spawn @animations Spooky(m)
+                        } else {
+                            player_find()
+                        }
+                        set m.active, m.selected = true, false
+                    }
+                    set spec.searching, R.frames = false, 0
+                }
+            }
+            set R.frames += 1
+            if (R.frames % 2) == 0 { set R.letters += 1 }
+        }
+    }
+
+    ;; the background, the monsters, the doors
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(back, -R.scroll, 0, rl.WHITE)
+            loop _,i in spec.draw {
+                val m = ms@i
+                rl.draw_texture_rec(m.tex, m.fx, 0, m.fw, m.fh, m.x - R.scroll, m.y, if m.selected => rl.RED => rl.WHITE)
+            }
+            loop _,i in spec.draw_doors {
+                val d = ds@i
+                rl.draw_texture_rec(doors, d.fx, d.fy, DW, DH, d.x - R.scroll, d.y, if d.selected => rl.GREEN => rl.WHITE)
+            }
+        }
+    }
+
+    ;; the message: typed, whole, "CHOOSE WISELY!", and the play
+    spawn {
+        val msg = spec.msg
+        par :any {
+            loop on :rl.frame {
+                var over = false
+                if R.letters <= #msg {
+                    set R.buffer = rl.text_subtext(msg, 0, R.letters)
+                } else {
+                    set R.buffer, R.letters, over = "", 0, true
+                }
+                until over || rl.key_pressed('ENTER')
+            }
+        } with {
+            loop on :rl.draw {
+                rl.rectangle(0, 40, W, 200, rl.fade(rl.LIGHTGRAY, 0.5))
+                rl.text_ex(font, R.buffer, 100, 80, SIZE, 2, rl.WHITE)
+            }
+        }
+        set R.phase = 1
+        par :any {
+            loop on :rl.frame {
+                set R.mc += 1
+                until rl.key_pressed('ENTER') || rl.mouse_pressed(0)
+            }
+        } with {
+            loop on :rl.draw {
+                rl.rectangle(0, 40, W, 200, rl.fade(rl.LIGHTGRAY, 0.5))
+                rl.text_ex(font, msg, 100, 80, SIZE, 2, rl.WHITE)
+                if ((R.mc // 30) % 2) == 1 {
+                    rl.text("PRESS ENTER or CLICK", W - 280, 200, 20, rl.BLACK)
+                }
+            }
+        }
+        set R.mc, R.phase = 0, 2
+        par :any {
+            loop on :rl.frame {
+                set R.mc += 1
+                until R.mc > 180
+            }
+        } with {
+            loop on :rl.draw {
+                rl.rectangle(0, 80, W, 100, rl.fade(rl.LIGHTGRAY, 0.5))
+                if ((R.mc // 30) % 2) == 1 {
+                    rl.text_ex(font, "CHOOSE WISELY!", 300, 95, SIZE * 2, 2, rl.WHITE)
+                    loop _,i in spec.choose {
+                        val b = (ms@i).bounds
+                        rl.rectangle_v(b.x, b.y, b.w, b.h, rl.fade(rl.RED, 0.6))
+                    }
+                }
+            }
+        }
+        set R.playing, R.phase = true, 3
+        par {
+            loop on :rl.frame {
+                set R.mc += 1
+            }
+        } with {
+            loop on :rl.draw {
+                if R.hover && (((R.mc // 30) % 2) == 1) {
+                    rl.rectangle(0, 0, W, 50, rl.fade(rl.LIGHTGRAY, 0.5))
+                    rl.text("PRESS SPACE or CLICK to INTERACT", 420, 15, 20, rl.BLACK)
+                }
+            }
+        }
+    }
+
+    ;; the key M of the attic; the scroll
+    spawn {
+        loop on :rl.frame {
+            if spec.cheat && rl.key_pressed('M') {
+                set pub = spec.cheat
+            }
+            if spec.scroll && (P.x > 200) {
+                set R.scroll = math.min(P.x - 200, 620)
+            }
+        }
+    }
+
+    spawn {
+        loop on :rl.draw {
+            player_draw()
+        }
+    }
+    await false
+}
+
+;; ---------------------------------------------------------------------------
+;; The logo of raylib, then the logo of the team.
+
+task LogoScreen () {
+    pin gray = rl.texture("resources/textures/skully_logo.png")
+    do {
+        pin l = spawn Logo(true, nil, nil)
+        await :rl.frame until l.pub
+    }
+    ;; the frames the C counted since the last letter of "raylib"
+    var count, a = 200, 1
+    loop {
+        set count += 1
+        set a = f32(a - f32(0.02))
+        until a <= 0
+    }
+    var alpha = 0
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(gray, (W//2) - (rl.texture_width(gray)//2), 130, rl.fade(rl.WHITE, alpha))
+            rl.text("GRAY TEAM", 340, 450, 100, rl.fade(rl.DARKGRAY, alpha))
+        }
+    }
+    loop {
+        await :rl.frame
+        set alpha = f32(alpha + f32(0.02))
+        until alpha >= 1
+    }
+    await rl.Frames(361 - count)        ;; until the count of the C is over 360
+    loop {
+        await :rl.frame
+        set alpha = f32(alpha - f32(0.02))
+        until alpha <= 0
+    }
+    await :rl.frame
+    set pub = [to=:title, now=true]
+    await false
+}
+
+;; "PRESS ... " blinks after 200 frames: 40 on, 40 off.
+task Blink (s) {
+    await rl.Frames(200)
+    loop {
+        watching rl.Frames(40) {
+            loop on :rl.draw {
+                rl.text(s, 380, 545, 40, rl.BLACK)
+            }
+        }
+        await rl.Frames(40)
+    }
+}
+
+var title_alpha = 0                     ;; static, never reset
+
+task Title () {
+    pin title = rl.texture("resources/textures/title.png")
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle(0, 0, W, H, rl.DARKGRAY)
+            rl.draw_texture(title, (W//2) - (rl.texture_width(title)//2), 20, rl.fade(rl.WHITE, title_alpha))
+        }
+    }
+    spawn Blink("PRESS ENTER to START")
+    loop on :rl.frame {
+        set title_alpha = math.min(f32(title_alpha + f32(0.005)), 1)
+        until rl.key_pressed('ENTER') || rl.mouse_pressed(0)
+    }
+    set pub = :attic
+    await false
+}
+
+var ending_alpha = 0                    ;; for the trace
+
+task Ending () {
+    set ending_alpha = 0
+    spawn {
+        loop on :rl.draw {
+            rl.rectangle(0, 0, W, H, rl.DARKGRAY)
+            rl.text_ex(font, "CONGRATULATIONS!", 50, 160, SIZE * 3, 2, rl.fade(rl.WHITE, ending_alpha))
+            rl.text_ex(font, "SKULLY ESCAPED!", 100, 300, SIZE * 3, 2, rl.fade(rl.WHITE, ending_alpha))
+        }
+    }
+    spawn Blink("PRESS ENTER or CLICK")
+    loop on :rl.frame {
+        set ending_alpha = math.min(f32(ending_alpha + f32(0.005)), 1)
+        until rl.key_pressed('ENTER') || rl.mouse_pressed(0)
+    }
+    set pub = :title
+    await false
+}
+
+;; the rooms as screens: a room, until it asks another screen (the C asks
+;; it at once, and the room goes on being drawn)
+task Attic () { pin r = spawn Room(:attic) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Aisle01 () { pin r = spawn Room(:aisle01) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Aisle02 () { pin r = spawn Room(:aisle02) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Bathroom () { pin r = spawn Room(:bathroom) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Livingroom () { pin r = spawn Room(:livingroom) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Kitchen () { pin r = spawn Room(:kitchen) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+task Armory () { pin r = spawn Room(:armory) ; await :rl.frame until r.pub ; set pub = r.pub ; await false }
+
+;; ---------------------------------------------------------------------------
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; the death: 80 frames after it (out of the transitions), the title, with
+;; four lives again
+spawn {
+    loop {
+        await :rl.frame until P.dead
+        await rl.Frames(80)
+        set P.dead, P.lifes = false, 4
+        set death = true
+    }
+}
+
+pin screens = spawn Screens([
+    logo=LogoScreen, title=Title, attic=Attic, aisle01=Aisle01, aisle02=Aisle02,
+    bathroom=Bathroom, livingroom=Livingroom, kitchen=Kitchen, armory=Armory, ending=Ending,
+], :logo, [
+    color = rl.BLACK,
+    inc = f32(0.05), into = \{ it >= 1 },
+    dec = f32(0.05), back = \{ it <= 0 },
+])
+
+spawn {
+    loop on :rl.frame {
+        rl.update_music(music)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+val NUMBER = [logo=0, title=1, attic=2, aisle01=3, aisle02=4, bathroom=5, livingroom=6, kitchen=7, armory=8, ending=9]
+func b (x) { if x => 1 => 0 }
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            val sc = screens.pub
+            var s = string.format("%d %d %d %.4f | %.0f %d %d %d %d %d %d |", rl.frame(), NUMBER@(sc.name), b(sc.trans), sc.alpha,
+                P.x, P.seq, P.cf, P.fx, b(P.key), P.lifes, b(P.dead))
+            if sc.name == :title {
+                set s = s ++ string.format(" %.4f", title_alpha)
+            }
+            if sc.name == :ending {
+                set s = s ++ string.format(" %.4f", ending_alpha)
+            }
+            if game {
+                val R = game.R
+                set s = s ++ string.format(" %d %d %d %d %d %d %d", R.phase, R.mc, R.letters, R.frames,
+                    b(ROOMS@(sc.name).searching), R.check, b(R.hover))
+                loop _,d in game.ds {
+                    set s = s ++ string.format(" D%d%d", b(d.locked), b(d.selected))
+                }
+                loop _,m in game.ms {
+                    set s = s ++ string.format(" M%d%d%d", b(m.active), b(m.selected), m.cf)
+                }
+                if ROOMS@(sc.name).scroll {
+                    set s = s ++ string.format(" %d", R.scroll)
+                }
+            }
+            print(s)
+        }
+    }
+}
+;; [/trace]
+
+await false

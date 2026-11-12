@@ -1033,7 +1033,7 @@ index 8afc851..c31bfff 100644
 +    printf(" M%d%d%d", chair.active, chair.selected, chair.currentFrame);
 +}
 diff --git a/skully_escape/src/screen_ending.c b/skully_escape/src/screen_ending.c
-index 7ed57bc..ec90340 100644
+index 7ed57bc..11a5342 100644
 --- a/skully_escape/src/screen_ending.c
 +++ b/skully_escape/src/screen_ending.c
 @@ -24,6 +24,7 @@
@@ -1052,7 +1052,7 @@ index 7ed57bc..ec90340 100644
 +// Atmos port: trace of the screen, after its logic
 +void TraceEndingScreen(void)
 +{
-+    printf(" %d %.4f", framesCounter, alpha);
++    printf(" %.4f", alpha);
 +}
 diff --git a/skully_escape/src/screen_kitchen.c b/skully_escape/src/screen_kitchen.c
 index bd0a5b4..9971379 100644
@@ -1109,7 +1109,7 @@ index da24032..5d911c6 100644
 +    printf(" M%d%d%d", phone.active, phone.selected, phone.currentFrame);
 +}
 diff --git a/skully_escape/src/screen_logo.c b/skully_escape/src/screen_logo.c
-index c36968f..13e57d3 100644
+index c36968f..d68ae9b 100644
 --- a/skully_escape/src/screen_logo.c
 +++ b/skully_escape/src/screen_logo.c
 @@ -24,6 +24,7 @@
@@ -1128,10 +1128,10 @@ index c36968f..13e57d3 100644
 +// Atmos port: trace of the screen, after its logic
 +void TraceLogoScreen(void)
 +{
-+    printf(" %d %d %d %.4f %.4f", state, framesCounter, lettersCount, alpha, logoAlpha);
++    
 +}
 diff --git a/skully_escape/src/screen_title.c b/skully_escape/src/screen_title.c
-index 95f027d..aabedd1 100644
+index 95f027d..15aab38 100644
 --- a/skully_escape/src/screen_title.c
 +++ b/skully_escape/src/screen_title.c
 @@ -24,6 +24,7 @@
@@ -1152,10 +1152,10 @@ index 95f027d..aabedd1 100644
 +// Atmos port: trace of the screen, after its logic
 +void TraceTitleScreen(void)
 +{
-+    printf(" %d %.4f", framesCounter, titleAlpha);
++    printf(" %.4f", titleAlpha);
 +}
 diff --git a/skully_escape/src/skully_escape.c b/skully_escape/src/skully_escape.c
-index 74a5641..6311ef0 100644
+index 74a5641..772afd2 100644
 --- a/skully_escape/src/skully_escape.c
 +++ b/skully_escape/src/skully_escape.c
 @@ -12,6 +12,19 @@
@@ -1185,7 +1185,7 @@ index 74a5641..6311ef0 100644
 +    // Atmos port: trace, one line per frame, after its logic
 +    if (RltFrame() > 0)
 +    {
-+        printf("%d %d %d %.4f %d | %.0f %d %d %d %d %d %d |", RltFrame(), currentScreen, onTransition, transAlpha, framesCounter,
++        printf("%d %d %d %.4f | %.0f %d %d %d %d %d %d |", RltFrame(), currentScreen, onTransition, transAlpha,
 +            player.position.x, player.currentSeq, player.currentFrame, (int)player.frameRec.x, player.key, player.numLifes, player.dead);
 +        switch (currentScreen)
 +        {
