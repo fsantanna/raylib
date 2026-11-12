@@ -422,3 +422,30 @@ reset under the fade).
 | the statics of each level | data; some reset by init, some never (`innerCircleRadius`, `moveSpeed`, `resetCounter`, the hover flags) | a table per level, `L00` to `L09`, and `init00` to `init09` |
 | `resetCounter`, `enableCounter` (level 09) | control: the clock of the chain of clicks, which goes on after done | **left**: `L09.reset`, `L09.enable`; the clock is the hook `always` of the level |
 | the logo: `state`, `framesCounter`, `lettersCount`, `alpha` | control | `Logo` of `screens.atm`, with a hook for the sound 20 frames after the letters |
+
+## skully_escape
+
+The screens of `screens.atm`, with this game's black fade (0.05 in and
+out); the logo of raylib, then the logo of the team. The seven rooms of
+the C are seven copies of one file; the port has one task, `Room`, and a
+table per room (doors, monsters, message, and the orders in which the C
+goes over them, which differ from room to room).
+
+| C | Kind | Port |
+|---|------|------|
+| `currentScreen`, `onTransition`, `transFadeOut`, `transAlpha`, `transToScreen`, `transFromScreen` | control | `Screens`; a room is a screen through a small task that passes on its `pub` |
+| `framesCounter` (main) | control: 80 frames after the death, then the title | a task: `await :rl.frame until P.dead`, `await rl.Frames(80)`; it asks the title through `death`, which the room reads first in its frame, as the C does |
+| `finishScreen` (each screen) | control | `pub` of the screen (the room it leads to) |
+| logo: `state`, `framesCounter`, `lettersCount`, `alpha`, `logoAlpha` | control | `Logo` of `screens.atm`, then a sequence for the logo of the team; the frames that the C counts from the letters of raylib into the logo of the team are counted once, in `count` |
+| title, ending: `framesCounter` | control: the blink after 200 frames | the task `Blink` |
+| `titleAlpha` | drawn; never reset | `title_alpha` |
+| `msgState` (each room) | control: typed, whole, "CHOOSE WISELY!", the play | a sequence of four phases in the task of the message; **left**: `R.playing`, which the logic of the room reads earlier in the frame (the player moves in the play only); `R.phase` for the trace |
+| `msgCounter`, `lettersCounter`, `msgBuffer` | drawn: the blinks (which go on from one phase to the next) and the typed text | **left**: `R.mc`, `R.letters`, `R.buffer` |
+| `framesCounter` (each room) | control and data: it counts the search (twice per frame) and the letters (every other frame), and a search resets it | **left**: `R.frames`, shared as in the C |
+| `searching`, `monsterCheck` | control: a search; never reset (a room visited again finds it on) | **left**: `spec.searching` (in the table of the room, which lives across visits), `R.check` |
+| `monsterHover` | drawn | `R.hover` |
+| `scroll` (aisles) | drawn, data | `R.scroll` |
+| the doors: `locked`, `selected`, `frameRec`, `bound` | data, drawn | `ds`, fresh at each visit |
+| the monsters: `active`, `selected`, `frameRec`, `bounds` | data, drawn | `ms`, fresh at each visit |
+| monster: `framesCounter`, `currentFrame` | control: a frame every 8, once found and scary | the task `Spooky` |
+| `player` and the statics of `player.c` (`movingAnim`, `moveDirection`, `nextMovePoint`, `outControl`, `animTimer`, `framesCounter`, `pointerAnim`, `pointerAlpha`) | data and control of the module of the player | **left**: `P`, the module of the C as functions over a table: the rooms call its update only in their play, in the middle of their frame, and its state goes from room to room |
