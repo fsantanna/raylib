@@ -244,3 +244,25 @@ the coins are taken, and the game goes on.
 | `player.maxSpd`, `acc`, `dcc`, `gravity`, `jumpImpulse`, `jumpRelease`, `width`, `height` | constant | `MAXSPD`, `ACC`, `DCC`, `GRAVITY`, `IMPULSE`, `RELEASE`, literals |
 | `tiles[]`, `camera`, `screenScale`, `screenWidth`, `screenHeight` | constant | `tiles`, `SCALE`, the window |
 | `score` | score | `score` |
+
+## tetris
+
+| C | Kind | Port |
+|---|------|------|
+| `gameOver` | control | the loop of pieces in `Play` ends when a cell of the two top rows is full |
+| `pause` | control | `Classic` |
+| `beginPlay` | control: the first piece draws one more | gone: `random_piece()` once before the loop of pieces |
+| `pieceActive` | control: set false by the fall, inside a function | **left**: `active`, which the fall clears and the loop of the piece reads |
+| `lineToDelete` | control | the value of `completion()`, then 33 frames of blinking in sequence |
+| `detection` | control: a flag passed between two functions in the same frame | gone: local to `fall()` |
+| `gravityMovementCounter` | control: a step every 30 frames | the task of gravity: 30 awaits of `:fall` |
+| `lateralMovementCounter` | control: a move every 10 frames, or at a press | the task of the sides |
+| `turnMovementCounter` | control: a turn every 12 frames, or at a press | the task of the turn |
+| `fastFallMovementCounter` | control: DOWN only after 30 frames of a piece | **left**: `fast` |
+| `fadeLineCounter` | control: 33 frames of blinking | `loop n in (1, 33)` |
+| `fadingColor` | drawn | `fading` |
+| `grid`, `piece`, `incomingPiece`, `piecePositionX`, `piecePositionY` | data, and drawn | `grid`, `piece`, `incoming`, `px`, `py` (grid in the order of the C) |
+| `lines` | score | `lines` |
+| `level`, `gravitySpeed` | constant (never changed) | `30` |
+
+Left in the port for the trace only: `phase`.

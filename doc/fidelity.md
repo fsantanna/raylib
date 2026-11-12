@@ -335,3 +335,24 @@ score.
 - What can differ, and no run does: ENTER pressed in the very frame the
   last coin is taken (the C restarts in that frame; the port, which hears
   ENTER before the coin is taken, in the next one).
+
+## tetris
+
+Same as the original on its runs `play` (6000 frames, 15 screens: random
+taps and holds of the arrows, a pause, game overs and restarts) and `seed2`
+(4000 frames, 11 screens).
+
+Trace: frame, phase, position of the piece, lines, full and moving cells.
+
+- **The functions over the grid** (fall, sides, turn, lines) are the ones of
+  the C, with the grid in its order in memory: the turn reads past the
+  bottom of a column, which in the C is the top of the next one.
+- **Lines are never cleared.** `CheckCompletion` starts its loop at
+  `j = GRID_VERTICAL_SIZE - 2 && !isEmptyRowFound`, which is 1: it checks
+  only the two top rows, and a piece that lands there ends the game in that
+  frame, before any check. The port keeps it; the blinking and the deletion
+  are ported, but no run can show them.
+- A turn in the frame a piece lands puts it back as moving, as in the C.
+- The repeats of the keys are counted in the frames of fall only (not in
+  the frame a piece appears, nor while lines blink), and carry from a piece
+  to the next, as the counters of the C.

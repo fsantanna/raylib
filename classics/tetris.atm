@@ -1,0 +1,369 @@
+;; raylib - classic game: tetris
+;;
+;; Sample game developed by Marc Palau and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/tetris.c` of
+;; raysan5/raylib-games. The game is the same; `gameOver`, `pause`,
+;; `beginPlay`, `lineToDelete`, `detection`, and the counters of frames of
+;; the C became tasks, awaits, and a toggle. The functions over the grid are
+;; the ones of the C.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H   = 800, 450
+val SQ     = 20
+val GW, GH = 12, 20             ;; the grid
+val EMPTY, MOVING, FULL, BLOCK, FADING = 0, 1, 2, 3, 4
+
+rl.window [title="classic game: tetris", width=W, height=H, fps=60]
+
+;; The grid and the pieces, as in the C: grid[i][j] is at i*GH + j, so that
+;; a read past the bottom of a column reads the top of the next one, as the
+;; C does when it turns a piece at the bottom.
+var grid     = []
+var piece    = []               ;; 4x4: piece[i][j] at i*4 + j
+var incoming = []
+var px, py   = 0, 0
+var lines    = 0
+var fading   = rl.GRAY
+var active   = false            ;; a piece falls (pieceActive)
+var fast     = 0                ;; frames of fall of this piece, for DOWN
+
+func g (i, j) { grid@((i*GH) + j) }
+func setg (i, j, v) { set grid@((i*GH) + j) = v }
+
+func random_piece () {
+    val r = rl.random(0, 6)
+    set incoming = []
+    loop k in 16 { set incoming@k = EMPTY }
+    val cells = match r {
+        0 => [[1,1],[2,1],[1,2],[2,2]]
+        1 => [[1,0],[1,1],[1,2],[2,2]]
+        2 => [[1,2],[2,0],[2,1],[2,2]]
+        3 => [[0,1],[1,1],[2,1],[3,1]]
+        4 => [[1,0],[1,1],[1,2],[2,1]]
+        5 => [[1,1],[2,1],[2,2],[3,2]]
+        6 => [[1,2],[2,2],[2,1],[3,1]]
+    }
+    loop _,c in cells {
+        set incoming@(((c@0)*4) + (c@1)) = MOVING
+    }
+}
+
+func create () {
+    set px, py = (GW - 4) // 2, 0
+    set piece = incoming ++ []
+    random_piece()
+    loop i in (px, px + 3) {
+        loop j in 4 {
+            if (piece@(((i - px)*4) + j)) == MOVING { setg(i, j, MOVING) }
+        }
+    }
+}
+
+;; As in the C: the loop starts at `j = (GRID_VERTICAL_SIZE - 2 && !isEmptyRowFound)`,
+;; which is 1, so only the two top rows are checked.
+func completion () {
+    var found = false
+    loop j in [1, 0] {
+        var n = 0
+        loop i in (1, GW - 2) {
+            if g(i, j) == FULL { set n += 1 }
+        }
+        if n == (GW - 2) {
+            set found = true
+            loop z in (1, GW - 2) { setg(z, j, FADING) }
+        }
+    }
+    found
+}
+
+func delete () {
+    var deleted = 0
+    loop jj in (0, GH - 2) {
+        val j = (GH - 2) - jj
+        loop {
+            while g(1, j) == FADING
+            loop i in (1, GW - 2) { setg(i, j, EMPTY) }
+            loop kk in (0, j - 1) {
+                val j2 = (j - 1) - kk
+                loop i2 in (1, GW - 2) {
+                    ifs {
+                        g(i2, j2) == FULL   => { setg(i2, j2 + 1, FULL);   setg(i2, j2, EMPTY) }
+                        g(i2, j2) == FADING => { setg(i2, j2 + 1, FADING); setg(i2, j2, EMPTY) }
+                    }
+                }
+            }
+            set deleted += 1
+        }
+    }
+    deleted
+}
+
+;; Calls f(i, j) on the cells from the bottom row up, left to right.
+func cells (f) {
+    loop jj in (0, GH - 2) {
+        loop i in (1, GW - 2) {
+            f(i, (GH - 2) - jj)
+        }
+    }
+}
+
+;; One step down, or the piece lands.
+func fall () {
+    var hit = false
+    cells \(i, j) {
+        if (g(i, j) == MOVING) && ((g(i, j + 1) == FULL) || (g(i, j + 1) == BLOCK)) { set hit = true }
+    }
+    if hit {
+        cells \(i, j) {
+            if g(i, j) == MOVING {
+                setg(i, j, FULL)
+                set active = false
+            }
+        }
+    } else {
+        cells \(i, j) {
+            if g(i, j) == MOVING {
+                setg(i, j + 1, MOVING)
+                setg(i, j, EMPTY)
+            }
+        }
+        set py += 1
+    }
+}
+
+;; A move to the side, with the arrow held; true if blocked.
+func lateral () {
+    var hit = false
+    ifs {
+        rl.key_down('LEFT') => {
+            cells \(i, j) {
+                if (g(i, j) == MOVING) && (((i - 1) == 0) || (g(i - 1, j) == FULL)) { set hit = true }
+            }
+            if !hit {
+                cells \(i, j) {
+                    if g(i, j) == MOVING {
+                        setg(i - 1, j, MOVING)
+                        setg(i, j, EMPTY)
+                    }
+                }
+                set px -= 1
+            }
+        }
+        rl.key_down('RIGHT') => {
+            cells \(i, j) {
+                if (g(i, j) == MOVING) && (((i + 1) == (GW - 1)) || (g(i + 1, j) == FULL)) { set hit = true }
+            }
+            if !hit {
+                loop jj in (0, GH - 2) {
+                    loop ii in (1, GW - 1) {
+                        val i, j = GW - ii, (GH - 2) - jj
+                        if g(i, j) == MOVING {
+                            setg(i + 1, j, MOVING)
+                            setg(i, j, EMPTY)
+                        }
+                    }
+                }
+                set px += 1
+            }
+        }
+    }
+    hit
+}
+
+;; A turn, with UP held; true if UP is held (turned or not), as in the C.
+func turn () {
+    if !rl.key_down('UP') {
+        return false
+    }
+    ;; a turn is blocked if a cell of the piece would move onto something
+    val x, y = px, py
+    val blocked = func (a, b) {
+        val v = g(x + (b@0), y + (b@1))
+        (g(x + (a@0), y + (a@1)) == MOVING) && (v != EMPTY) && (v != MOVING)
+    }
+    val checks = [
+        [[3,0],[0,0]], [[3,3],[3,0]], [[0,3],[3,3]], [[0,0],[0,3]],
+        [[1,0],[0,2]], [[3,1],[1,0]], [[2,3],[3,1]], [[0,2],[2,3]],
+        [[2,0],[0,1]], [[3,2],[2,0]], [[1,3],[3,2]], [[0,1],[1,3]],
+        [[1,1],[1,2]], [[2,1],[1,1]], [[2,2],[2,1]], [[1,2],[2,2]],
+    ]
+    val checker = loop _,c in checks {
+        until blocked(c@0, c@1)
+    }
+    if !checker {
+        val p = func (i, j) { (i*4) + j }
+        loop _,r in [ [[0,0],[3,0],[3,3],[0,3]], [[1,0],[3,1],[2,3],[0,2]],
+                      [[2,0],[3,2],[1,3],[0,1]], [[1,1],[2,1],[2,2],[1,2]] ] {
+            val a, b, c, d = p(r@0@0, r@0@1), p(r@1@0, r@1@1), p(r@2@0, r@2@1), p(r@3@0, r@3@1)
+            val aux = piece@a
+            set piece@a, piece@b, piece@c, piece@d = piece@b, piece@c, piece@d, aux
+        }
+    }
+    cells \(i, j) {
+        if g(i, j) == MOVING { setg(i, j, EMPTY) }
+    }
+    loop i in (px, px + 3) {
+        loop j in (py, py + 3) {
+            if (piece@(((i - px)*4) + (j - py))) == MOVING { setg(i, j, MOVING) }
+        }
+    }
+    true
+}
+
+;; One game: piece after piece, until a landed piece reaches the two top
+;; rows.
+task Play () {
+    set grid, lines, fading, active, fast = [], 0, rl.GRAY, false, 0
+    set px, py = 0, 0
+    loop i in GW {
+        loop j in GH {
+            setg(i, j, if (j == (GH - 1)) || (i == 0) || (i == (GW - 1)) => BLOCK => EMPTY)
+        }
+    }
+    set incoming = []
+    loop k in 16 { set incoming@k = EMPTY }
+
+    ;; The repeats of the keys, counted in the frames of fall (`:fall`), and
+    ;; kept from a piece to the next, as the counters of the C. In each frame
+    ;; of fall, in this order: gravity, sides, turn.
+    spawn {
+        ;; gravity: a step every 30 frames, or in each frame with DOWN held
+        ;; after the first 30 frames of the piece
+        loop {
+            loop n in (1, 30) {
+                await :fall
+                until (n == 30) || (rl.key_down('DOWN') && (fast >= 30))
+            }
+            fall()
+        }
+    }
+    spawn {
+        ;; sides: every 10 frames, or at once on a press; again in each frame
+        ;; while blocked
+        loop {
+            loop n in (1, 10) {
+                await :fall
+                until (n == 10) || rl.key_pressed('LEFT') || rl.key_pressed('RIGHT')
+            }
+            loop {
+                until !lateral()
+                await :fall
+            }
+        }
+    }
+    spawn {
+        ;; turn: every 12 frames, or at once on a press, if UP is held; else
+        ;; at the first frame with UP held
+        loop {
+            loop n in (1, 12) {
+                await :fall
+                until (n == 12) || rl.key_pressed('UP')
+            }
+            loop {
+                until turn()
+                await :fall
+            }
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            var x, y = (((W//2) - ((GW*SQ)//2)) - 50), ((((H//2) - (((GH - 1)*SQ)//2)) + (SQ*2)) - 50)
+            loop j in GH {
+                loop i in GW {
+                    val v = g(i, j)
+                    if v == EMPTY {
+                        rl.line(x, y, x + SQ, y, rl.LIGHTGRAY)
+                        rl.line(x, y, x, y + SQ, rl.LIGHTGRAY)
+                        rl.line(x + SQ, y, x + SQ, y + SQ, rl.LIGHTGRAY)
+                        rl.line(x, y + SQ, x + SQ, y + SQ, rl.LIGHTGRAY)
+                    } else {
+                        rl.rectangle(x, y, SQ, SQ, match v {
+                            FULL   => rl.GRAY
+                            MOVING => rl.DARKGRAY
+                            BLOCK  => rl.LIGHTGRAY
+                            FADING => fading
+                        })
+                    }
+                    set x += SQ
+                }
+                set x = ((W//2) - ((GW*SQ)//2)) - 50
+                set y += SQ
+            }
+            set x, y = 500, 45
+            loop j in 4 {
+                loop i in 4 {
+                    val v = incoming@((i*4) + j)
+                    if v == EMPTY {
+                        rl.line(x, y, x + SQ, y, rl.LIGHTGRAY)
+                        rl.line(x, y, x, y + SQ, rl.LIGHTGRAY)
+                        rl.line(x + SQ, y, x + SQ, y + SQ, rl.LIGHTGRAY)
+                        rl.line(x, y + SQ, x + SQ, y + SQ, rl.LIGHTGRAY)
+                    } else {
+                        rl.rectangle(x, y, SQ, SQ, rl.GRAY)
+                    }
+                    set x += SQ
+                }
+                set x = 500
+                set y += SQ
+            }
+            rl.text("INCOMING:", x, y - 100, 10, rl.GRAY)
+            rl.text(string.format("LINES:      %04d", lines), x, y + 20, 10, rl.GRAY)
+        }
+    }
+
+    val over = func () {
+        loop j in 2 {
+            loop i in (1, GW - 2) {
+                if g(i, j) == FULL { return true }
+            }
+        }
+        false
+    }
+    random_piece()                  ;; the first incoming piece (beginPlay)
+    loop {
+        ;; a frame: the lines of the last piece, and a new piece
+        await :rl.frame
+        val full = completion()
+        create()
+        set active, fast = true, 0
+        until over()
+        ;; the full lines blink for 33 frames, and go
+        if full {
+            loop n in (1, 33) {
+                await :rl.frame
+                set fading = if (n % 8) < 4 => rl.MAROON => rl.GRAY
+            }
+            set lines += delete()
+        }
+        ;; the piece falls until it lands
+        loop {
+            await :rl.frame
+            set fast += 1
+            emit :fall
+            until over()
+            while active
+        }
+        until over()
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            var nf, nm = 0, 0
+            loop _,v in grid {
+                if v == FULL { set nf += 1 }
+                if v == MOVING { set nm += 1 }
+            }
+            print(string.format("%d %s %d %d %d %d %d", rl.frame(), phase, px, py, lines, nf, nm))
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)

@@ -28,3 +28,4 @@ the runs: no number here is typed by hand.
 | asteroids | 402 | 262 | 3940 | 2176 | 7 | 1 | 2 (1249 frames, 25 screens) | yes |
 | pang | 446 | 210 | 4072 | 1791 | 8 | 2 | 2 (2998 frames, 38 screens) | yes |
 | platformer | 466 | 170 | 3277 | 1767 | 4 | 0 | 2 (1634 frames, 43 screens) | yes |
+| tetris | 577 | 341 | 4370 | 2894 | 11 | 2 | 2 (10000 frames, 26 screens) | yes |

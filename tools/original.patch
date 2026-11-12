@@ -303,3 +303,37 @@ index 0634a67..9760206 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/tetris.c b/classics/src/tetris.c
+index 0dd7eeb..808cf29 100644
+--- a/classics/src/tetris.c
++++ b/classics/src/tetris.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <time.h>
+@@ -296,6 +299,19 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        int nf = 0, nm = 0;
++        for (int i = 0; i < GRID_HORIZONTAL_SIZE; i++) for (int j = 0; j < GRID_VERTICAL_SIZE; j++)
++        {
++            nf += (grid[i][j] == FULL);
++            nm += (grid[i][j] == MOVING);
++        }
++        printf("%d %s %d %d %d %d %d\n", RltFrame(), gameOver? "over" : (pause? "pause" : "play"),
++            piecePositionX, piecePositionY, lines, nf, nm);
++    }
+ }
+ 
+ // Draw game (one frame)
