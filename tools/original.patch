@@ -362,3 +362,92 @@ index 18569e6..f2ff680 100644
      BeginDrawing();
      ClearBackground(BLACK);
  
+diff --git a/repair/src/repair.c b/repair/src/repair.c
+index e5e0f78..7f891ed 100644
+--- a/repair/src/repair.c
++++ b/repair/src/repair.c
+@@ -13,6 +13,10 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++int RepairMatch(void);      // Atmos port: trace (screen_ending.c)
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #if defined(PLATFORM_WEB)
+@@ -399,6 +403,15 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic and before the drawing
++    if (RltFrame() > 0)
++    {
++        printf("%d ", RltFrame());
++        if (player.colHead) printf("%d %u %d %u %d %d %d ", player.head, (unsigned)player.colHead, player.hair, (unsigned)player.colHair, player.eyes, player.nose, player.mouth); else printf("- ");
++        if (dating.colHead) printf("%d %u %d %u %d %d %d ", dating.head, (unsigned)dating.colHead, dating.hair, (unsigned)dating.colHair, dating.eyes, dating.nose, dating.mouth); else printf("- ");
++        printf("%d\n", RepairMatch());
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
+diff --git a/repair/src/screen_ending.c b/repair/src/screen_ending.c
+index a130302..4d5ffe7 100644
+--- a/repair/src/screen_ending.c
++++ b/repair/src/screen_ending.c
+@@ -244,4 +244,6 @@ void UnloadEndingScreen(void)
+ int FinishEndingScreen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace
++int RepairMatch(void) { return matchValue; }
+diff --git a/wave_collector/src/screen_gameplay.c b/wave_collector/src/screen_gameplay.c
+index 5ec7b84..10cbc7e 100644
+--- a/wave_collector/src/screen_gameplay.c
++++ b/wave_collector/src/screen_gameplay.c
+@@ -487,4 +487,10 @@ static void DrawSamplesMap(Sample *samples, int sampleCount, int playedSamples,
+         DrawLineV((Vector2){ (float)bounds.x + (float)i*sampleIncrementX, (float)(bounds.y + bounds.height/2) + samples[i].value*bounds.height },
+                   (Vector2){ (float)bounds.x + (float)(i + 1)*sampleIncrementX, (float)(bounds.y  + bounds.height/2) + + samples[i + 1].value*bounds.height }, col);
+     }
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the gameplay, one line per frame, after its logic
++void TraceGameplay(int frame)
++{
++    printf("%d %d %.4f %d %d %d %.6f %.4f %d\n", frame, endingStatus, player.position.y, collectedSamples,
++        combo, currentSample, synchro, samplesSpeed, (int)warpCounter);
++}
+diff --git a/wave_collector/src/wave_collector.c b/wave_collector/src/wave_collector.c
+index 30aac25..c45592b 100644
+--- a/wave_collector/src/wave_collector.c
++++ b/wave_collector/src/wave_collector.c
+@@ -15,6 +15,9 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++int RltFrame(void);             // Atmos port: frame of the test mode (tools/raylib.patch)
++void TraceGameplay(int frame);  // Atmos port: trace (screen_gameplay.c)
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #include <stdlib.h>     // Required for:
+@@ -287,6 +290,13 @@ static void UpdateDrawFrame(void)
+ 
+     // TODO: Review! It breaks the game... issues with audio buffering...
+     if (currentScreen != ENDING) UpdateMusicStream(music);
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        if (currentScreen == GAMEPLAY) TraceGameplay(RltFrame());
++        else printf("%d %d\n", RltFrame(), endingStatus);
++    }
+     //----------------------------------------------------------------------------------
+ 
+     // Draw

@@ -1,0 +1,6 @@
+# The logo, a click on the title, the gameplay with the mouse still, the
+# warp, a pause of 60 frames.
+FRAMES=1500
+SEED=1
+INPUT=700:mv:640:300,700:md:0,701:mu:0,800:mv:640:400,900:dn:SPACE,1000:up:SPACE,1100:dn:P,1101:up:P,1160:dn:P,1161:up:P
+SHOTS="1 50 100 200 300 400 500 600 650 700 720 722 730 800 1000 1130 1300 1500"

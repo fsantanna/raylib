@@ -379,3 +379,29 @@ Trace: frame, mode, generations, cells, interval, camera.
   frame), and the next frame sets it back to 0, as in the C.
 - The board, its step, and its drawing are the loops of the C, in a
   prelude of the port.
+
+## wave_collector
+
+Runs: `pause` (1500 frames, 18 screens: the logo, the title, the gameplay
+with the warp and a pause), `lose` (2835 frames, 14 screens: the wave
+followed for 1500 frames, then not; the synchro falls to 0; the ending, the
+title again) and `win` (9388 frames, 14 screens: the whole wave, 573 of 573
+samples, with the warp; the ending, the title again).
+
+Trace: frame, ending status; in the gameplay also the player, the samples
+collected, the combo, the last sample passed, the synchro, the speed, the
+warp.
+
+- **The level** is read from the audio of the wave (`LoadWave`,
+  `LoadWaveSamples`), as the C does, by the same C in a prelude of the
+  port: 573 samples.
+- **The logo** of `games/screens.atm` first ended its bars one frame late
+  (see doc/compiler.md, `watching ... until`); the screens showed it.
+- **The title** fades in only on the first visit: `titleAlpha` is never
+  reset, so the port keeps it out of the screen. The run `lose` found it.
+- **The transition** fades to white in 20 frames and back in one frame
+  (`(int)transAlpha <= 0` holds as soon as the alpha leaves 1), and a new
+  screen starts to update in the second frame after it appears, as in the
+  C.
+- A run of the whole wave takes about 3 minutes for each side: the software
+  renderer draws 1280 by 720 with some 600 shapes per frame.

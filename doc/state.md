@@ -278,3 +278,30 @@ Left in the port for the trace only: `phase`.
 | `generations_interval` | data: set by UP and DOWN | `interval` |
 | `camera` | data | `camera` |
 | `maxGenerations` | constant, from the command line | `MAX` |
+
+## wave_collector
+
+The games with screens share `games/screens.atm`: the logo of raylib as a
+sequence, and `Screens`, which runs a screen until it names the next one,
+fades to white over it, and starts the next one (the C: `currentScreen`,
+`onTransition`, `transFadeOut`, `transAlpha`, `transFromScreen`,
+`transToScreen`, and in each screen `finishScreen`). The logo's
+`framesCounter`, `state`, `lettersCount`, and the widths of its bars are
+awaits and loops there.
+
+| C | Kind | Port |
+|---|------|------|
+| `currentScreen`, `onTransition`, `transFadeOut`, `transFromScreen`, `transToScreen` | control | `Screens` |
+| `transAlpha` | drawn | `alpha`, local to `Screens` |
+| `finishScreen` (each screen) | control | the screen sets its `pub` to the next one |
+| `framesCounter` (title, ending) | control: a text that blinks from a frame on | `Blink`: an await, then 40 frames on and 40 off |
+| `framesCounter` (gameplay) | control, never read | gone |
+| `pause` | control | `toggle logic(false)`; "WAVE PAUSED" is a task that lives while paused |
+| `endingStatus` | data: the result, read by the ending | `ending` |
+| `samples[].active` | control: a sample that passed the player is a miss only once | **left**: `s.on` |
+| `samples[].collected` | drawn | `s.got` |
+| `samples[].renderable` | control: computed in the update, read in the drawing | gone: the drawing computes it |
+| `samples[].position`, `.value` | drawn, and data | `samples`, read from the audio by the C of the original |
+| `player`, `warpCounter`, `samplesSpeed`, `synchro`, `combo`, `maxCombo`, `collectedSamples`, `currentSample`, `totalSamples` | drawn, and data | the fields of `g` |
+| `titleAlpha` | drawn; never reset, so a second visit to the title shows it at once | `title_alpha`, outside the screen |
+| textures, sounds, the render texture, the font, the music | resources | pinned in their screen, or for the whole program |
