@@ -898,3 +898,312 @@ index b9e3235..f31fcfe 100644
 +{
 +    printf(" "); for (int i = 0; i < NUM_BOXES; i++) printf("%c", CheckColor(bwColors[i], LIGHTGRAY)? 'L' : CheckColor(bwColors[i], GRAY)? 'G' : 'W'); printf(" "); for (int i = 0; i < NUM_BOXES; i++) printf("%d", activated[i]); printf(" %d %d %d %d", resetCounter, enableCounter, done, levelTimeSec);
 +}
+diff --git a/skully_escape/src/screen_aisle01.c b/skully_escape/src/screen_aisle01.c
+index 4132f28..eabe2f6 100644
+--- a/skully_escape/src/screen_aisle01.c
++++ b/skully_escape/src/screen_aisle01.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -397,3 +398,15 @@ int FinishAisle01Screen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceAisle01Screen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorLeft.locked, doorLeft.selected);
++    printf(" D%d%d", doorCenter.locked, doorCenter.selected);
++    printf(" D%d%d", doorRight.locked, doorRight.selected);
++    printf(" M%d%d%d", lamp.active, lamp.selected, lamp.currentFrame);
++    printf(" M%d%d%d", picture.active, picture.selected, picture.currentFrame);
++    printf(" %d", scroll);
++}
+diff --git a/skully_escape/src/screen_aisle02.c b/skully_escape/src/screen_aisle02.c
+index 31b0d6d..2087e8c 100644
+--- a/skully_escape/src/screen_aisle02.c
++++ b/skully_escape/src/screen_aisle02.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -432,3 +433,15 @@ int FinishAisle02Screen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceAisle02Screen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorLeft.locked, doorLeft.selected);
++    printf(" M%d%d%d", lamp.active, lamp.selected, lamp.currentFrame);
++    printf(" M%d%d%d", chair.active, chair.selected, chair.currentFrame);
++    printf(" M%d%d%d", picture.active, picture.selected, picture.currentFrame);
++    printf(" M%d%d%d", arc.active, arc.selected, arc.currentFrame);
++    printf(" %d", scroll);
++}
+diff --git a/skully_escape/src/screen_armory.c b/skully_escape/src/screen_armory.c
+index b3b4239..22bad8f 100644
+--- a/skully_escape/src/screen_armory.c
++++ b/skully_escape/src/screen_armory.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -392,3 +393,14 @@ int FinishArmoryScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceArmoryScreen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorLeft.locked, doorLeft.selected);
++    printf(" D%d%d", doorRight.locked, doorRight.selected);
++    printf(" M%d%d%d", blazon01.active, blazon01.selected, blazon01.currentFrame);
++    printf(" M%d%d%d", blazon02.active, blazon02.selected, blazon02.currentFrame);
++    printf(" M%d%d%d", blazon03.active, blazon03.selected, blazon03.currentFrame);
++}
+diff --git a/skully_escape/src/screen_attic.c b/skully_escape/src/screen_attic.c
+index cbf368f..1c9e1da 100644
+--- a/skully_escape/src/screen_attic.c
++++ b/skully_escape/src/screen_attic.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -320,3 +321,12 @@ int FinishAtticScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceAtticScreen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorRight.locked, doorRight.selected);
++    printf(" M%d%d%d", lamp.active, lamp.selected, lamp.currentFrame);
++    printf(" M%d%d%d", arc.active, arc.selected, arc.currentFrame);
++}
+diff --git a/skully_escape/src/screen_bathroom.c b/skully_escape/src/screen_bathroom.c
+index 8afc851..c31bfff 100644
+--- a/skully_escape/src/screen_bathroom.c
++++ b/skully_escape/src/screen_bathroom.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -371,3 +372,13 @@ int FinishBathroomScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceBathroomScreen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorRight.locked, doorRight.selected);
++    printf(" M%d%d%d", lamp.active, lamp.selected, lamp.currentFrame);
++    printf(" M%d%d%d", mirror.active, mirror.selected, mirror.currentFrame);
++    printf(" M%d%d%d", chair.active, chair.selected, chair.currentFrame);
++}
+diff --git a/skully_escape/src/screen_ending.c b/skully_escape/src/screen_ending.c
+index 7ed57bc..ec90340 100644
+--- a/skully_escape/src/screen_ending.c
++++ b/skully_escape/src/screen_ending.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -85,3 +86,9 @@ int FinishEndingScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the screen, after its logic
++void TraceEndingScreen(void)
++{
++    printf(" %d %.4f", framesCounter, alpha);
++}
+diff --git a/skully_escape/src/screen_kitchen.c b/skully_escape/src/screen_kitchen.c
+index bd0a5b4..9971379 100644
+--- a/skully_escape/src/screen_kitchen.c
++++ b/skully_escape/src/screen_kitchen.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -391,3 +392,14 @@ int FinishKitchenScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceKitchenScreen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorLeft.locked, doorLeft.selected);
++    printf(" D%d%d", doorRight.locked, doorRight.selected);
++    printf(" M%d%d%d", closet.active, closet.selected, closet.currentFrame);
++    printf(" M%d%d%d", chair.active, chair.selected, chair.currentFrame);
++    printf(" M%d%d%d", window.active, window.selected, window.currentFrame);
++}
+diff --git a/skully_escape/src/screen_livingroom.c b/skully_escape/src/screen_livingroom.c
+index da24032..5d911c6 100644
+--- a/skully_escape/src/screen_livingroom.c
++++ b/skully_escape/src/screen_livingroom.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ #include "player.h"
+ #include "monster.h"
+@@ -390,3 +391,14 @@ int FinishLivingroomScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the room, after its logic
++void TraceLivingroomScreen(void)
++{
++    printf(" %d %d %d %d %d %d %d", msgState, msgCounter, lettersCounter, framesCounter, searching, monsterCheck, monsterHover);
++    printf(" D%d%d", doorLeft.locked, doorLeft.selected);
++    printf(" D%d%d", doorCenter.locked, doorCenter.selected);
++    printf(" M%d%d%d", candle.active, candle.selected, candle.currentFrame);
++    printf(" M%d%d%d", picture.active, picture.selected, picture.currentFrame);
++    printf(" M%d%d%d", phone.active, phone.selected, phone.currentFrame);
++}
+diff --git a/skully_escape/src/screen_logo.c b/skully_escape/src/screen_logo.c
+index c36968f..13e57d3 100644
+--- a/skully_escape/src/screen_logo.c
++++ b/skully_escape/src/screen_logo.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -208,3 +209,9 @@ int FinishLogoScreen(void)
+ {
+     return finishScreen;
+ }
++
++// Atmos port: trace of the screen, after its logic
++void TraceLogoScreen(void)
++{
++    printf(" %d %d %d %.4f %.4f", state, framesCounter, lettersCount, alpha, logoAlpha);
++}
+diff --git a/skully_escape/src/screen_title.c b/skully_escape/src/screen_title.c
+index 95f027d..aabedd1 100644
+--- a/skully_escape/src/screen_title.c
++++ b/skully_escape/src/screen_title.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -87,4 +88,9 @@ void UnloadTitleScreen(void)
+ int FinishTitleScreen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the screen, after its logic
++void TraceTitleScreen(void)
++{
++    printf(" %d %.4f", framesCounter, titleAlpha);
++}
+diff --git a/skully_escape/src/skully_escape.c b/skully_escape/src/skully_escape.c
+index 74a5641..6311ef0 100644
+--- a/skully_escape/src/skully_escape.c
++++ b/skully_escape/src/skully_escape.c
+@@ -12,6 +12,19 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++void TraceLogoScreen(void);
++void TraceTitleScreen(void);
++void TraceAtticScreen(void);
++void TraceAisle01Screen(void);
++void TraceAisle02Screen(void);
++void TraceBathroomScreen(void);
++void TraceLivingroomScreen(void);
++void TraceKitchenScreen(void);
++void TraceArmoryScreen(void);
++void TraceEndingScreen(void);
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #include "player.h"     // Player functionality
+@@ -381,6 +394,28 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        printf("%d %d %d %.4f %d | %.0f %d %d %d %d %d %d |", RltFrame(), currentScreen, onTransition, transAlpha, framesCounter,
++            player.position.x, player.currentSeq, player.currentFrame, (int)player.frameRec.x, player.key, player.numLifes, player.dead);
++        switch (currentScreen)
++        {
++            case LOGO: TraceLogoScreen(); break;
++            case TITLE: TraceTitleScreen(); break;
++            case ATTIC: TraceAtticScreen(); break;
++            case AISLE01: TraceAisle01Screen(); break;
++            case AISLE02: TraceAisle02Screen(); break;
++            case BATHROOM: TraceBathroomScreen(); break;
++            case LIVINGROOM: TraceLivingroomScreen(); break;
++            case KITCHEN: TraceKitchenScreen(); break;
++            case ARMORY: TraceArmoryScreen(); break;
++            case ENDING: TraceEndingScreen(); break;
++            default: break;
++        }
++        printf("\n");
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
