@@ -449,3 +449,25 @@ goes over them, which differ from room to room).
 | the monsters: `active`, `selected`, `frameRec`, `bounds` | data, drawn | `ms`, fresh at each visit |
 | monster: `framesCounter`, `currentFrame` | control: a frame every 8, once found and scary | the task `Spooky` |
 | `player` and the statics of `player.c` (`movingAnim`, `moveDirection`, `nextMovePoint`, `outControl`, `animTimer`, `framesCounter`, `pointerAnim`, `pointerAlpha`) | data and control of the module of the player | **left**: `P`, the module of the C as functions over a table: the rooms call its update only in their play, in the middle of their frame, and its state goes from room to room |
+
+## retro_maze_3d
+
+One function in the C, with a switch on the screen; no transitions. The
+maze (mesh, model, camera, collisions against the pixels of the map) is
+the C of the original, in a prelude.
+
+| C | Kind | Port |
+|---|------|------|
+| `currentScreen` | control | tasks `Logo`, `Title`, `Gameplay`, `Credits`, `Ending`, each returning the next; **left**: `screen`, for the trace |
+| `framesCounter` (logo, title) | control: 300 frames of logo; 140 of title before the 3D | `await rl.Frames(301)`, `await rl.Frames(141)` |
+| `titleState` | drawn: down, the 3D, the shadows; not reset when coming back from a game | **left**: `title`, read by the drawing and by `Title` to go on from where it was |
+| `elementPositionY`, `creditsScrollingPosY` | drawn | `y`, `credits_y` |
+| `optionSelect` | drawn; shared by the title and the pause menu | `option` |
+| `framesCounter` (play) | control: a second every 60 frames of play, not counted in the pause, reset by any choice of a menu | **left**: `frames` |
+| `showInGameMenu` | control: the pause, toggled by SPACE before the logic of the same frame | **left**: `paused` (drawn too) |
+| `showMinimapDebug`, `gpiCaseMode` | drawn | `minimap`, `gpi` |
+| `timeLevelSeconds`, `staminaLevel` | drawn; never reset | `seconds`, `stamina` |
+| `playerMoving`, `stepFrameCount` | data: the steps (also counted in the pause, from the last state) | `moving`, `steps` |
+| `endingResult` | drawn | `result` |
+| `exitGame` | control: the end of the program after the frame | the screen returns `:exit` after the drawing of its frame; **left**: `exiting`, for the trace |
+| `camera`, `playerPosition`, `playerCellX/Y`, `mapPixels`, the model | data | the C in the prelude |

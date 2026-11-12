@@ -585,3 +585,29 @@ frame), and the scroll of the aisles.
   those 80 frames, when the scared player cannot move: no run does it.
 - The logo of the team waits until the frames counted since the last
   letter of raylib reach 360, as the C counts them.
+
+## retro_maze_3d
+
+Same as the original on its runs `start` (700 frames, 20 screens: the
+logo, the title, the menu, the maze, the map, the pause), `menus` (1500
+frames, 20 screens) and `play` (4892 frames, 18 screens: the maze walked
+to its exit, the end, the credits, the title). `play` is made by
+`tst/retro_maze_3d/gen.py`: the shortest path on the map, cut in 56
+segments, each a turn of the mouse and a walk with W; the original, run
+before each segment, gives where the camera is.
+
+Trace: frame, screen, the title (state, position), the option; the camera
+(position, target), the cell, the time, the stamina, the steps; the pause,
+the map, the credits, the result, the GPi mode, the exit.
+
+- **3D in software.** The maze is drawn by the rlsw renderer of the test
+  mode, in both: the same calls give the same pixels.
+- **Never reset.** The time and the stamina of a game go on in the next;
+  the title, back from a game, goes on from where its animation was (the
+  run `menus` starts a game before the 3D shows up).
+- **One option for two menus.** The pause menu and the title share the
+  option: back to the title, ENTER chooses what the pause left.
+- **The 3D at once.** The C checks its counter twice: the 3D shows up after
+  140 frames, and the shadows one frame later.
+- The time and the stamina running out are not in a run: they take 18000
+  and 10000 frames.
