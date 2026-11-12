@@ -370,6 +370,13 @@ val rl = [
     time       = func () { `:number GetTime()` },
     frame_time = func () { `:number GetFrameTime()` },
 
+    ;; rl.f32(x): x rounded to a float of 32 bits, as raylib keeps positions;
+    ;; to do the arithmetic of the C on floats, round the result of each
+    ;; operation that may be inexact
+    f32 = func (x) {
+        `:number.float (double)(float)a_dbl($x)`
+    },
+
     ;; rl.random(min, max): GetRandomValue, both included
     random = func (min, max) {
         `:number GetRandomValue(RL_I($min), RL_I($max))`

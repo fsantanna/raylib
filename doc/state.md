@@ -73,3 +73,23 @@ Left in the port for the trace only: `phase`.
 | `score`, `hiScore` | score | `score`, `hiscore` |
 
 Left in the port for the trace only: `phase`.
+
+## arkanoid
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control: no lives, or no bricks | `Play` awaits `<(b) \|\| :all bricks>`: the ball ends with the last life, the pool of bricks drains with the last brick |
+| `pause` | control | `Classic` |
+| `ball.active` | control: the ball is on the paddle | the task `Ball`: a `watching` of SPACE that keeps it on the paddle, then a loop until it falls |
+| `brick[][].active` | control | the task `Brick`, which ends when hit; its pool is the set of bricks left |
+| `brick[][].position` | constant per brick | `x`, `y`, local to each `Brick` |
+| `brickSize` | constant | `BW`, `BH` |
+| `player.position` | drawn | `player` |
+| `player.size` | constant | `80`, `20` |
+| `player.life` | data: the lives | `life` |
+| `ball.position`, `ball.speed` | drawn, and data | `ball` |
+| `ball.radius` | constant | `R` |
+
+Left in the port for the trace only: `phase`, and `bricks_left`, the number
+of bricks, which the C counts in its trace.

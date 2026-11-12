@@ -1,0 +1,147 @@
+;; raylib - classic game: arkanoid
+;;
+;; Sample game developed by Marc Palau and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/arkanoid.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `ball.active`, and `brick[][].active` of
+;; the C became tasks, awaits, and a toggle.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H   = 800, 450
+val LIVES  = 5
+val ROWS, COLS = 5, 20
+val BW, BH = 40, 40             ;; a brick
+val R      = 7                  ;; the ball
+val f32    = rl.f32             ;; the ball moves on floats, as in the C
+
+rl.window [title="classic game: arkanoid", width=W, height=H, fps=60]
+
+var player = [x=0, y=0]
+var ball   = [x=0, y=0, sx=0, sy=0]
+var life   = 0
+var bricks_left = 0             ;; for the trace
+
+;; The paddle and the lives.
+task Player () {
+    par {
+        loop on :rl.frame {
+            if rl.key_down('LEFT') { set player.x -= 5 }
+            if (player.x - 40) <= 0 { set player.x = 40 }
+            if rl.key_down('RIGHT') { set player.x += 5 }
+            if (player.x + 40) >= W { set player.x = W - 40 }
+        }
+    } with {
+        loop on :rl.draw {
+            rl.rectangle(player.x - 40, player.y - 10, 80, 20, rl.BLACK)
+            loop i in life {
+                rl.rectangle(20 + (40*i), H - 30, 35, 10, rl.LIGHTGRAY)
+            }
+        }
+    }
+}
+
+;; The ball: on the paddle until SPACE, then free until it falls. Ends when
+;; the last life falls.
+task Ball () {
+    par :any {
+        loop {
+            watching :rl.key.dn [name='SPACE'] {
+                loop on :rl.frame {
+                    set ball.x, ball.y = player.x, (player.y - 10) - R
+                }
+            }
+            set ball.sx, ball.sy = 0, -5
+            loop on :rl.frame {
+                set ball.x = f32(ball.x + ball.sx)
+                set ball.y = ball.y + ball.sy
+                if (f32(ball.x + R) >= W) || (f32(ball.x - R) <= 0) {
+                    set ball.sx = -ball.sx
+                }
+                if (ball.y - R) <= 0 {
+                    set ball.sy = -ball.sy
+                }
+                until (ball.y + R) >= H
+                if rl.check_collision_circle_rec(ball.x, ball.y, R, player.x - 40, player.y - 10, 80, 20) && (ball.sy > 0) {
+                    set ball.sy = -ball.sy
+                    set ball.sx = f32(f32(f32(ball.x - player.x) / 40) * 5)
+                }
+            }
+            set ball.sx, ball.sy = 0, 0
+            set life -= 1
+            until life <= 0
+        }
+    } with {
+        loop on :rl.draw {
+            rl.circle_v(ball.x, ball.y, R, rl.MAROON)
+        }
+    }
+}
+
+;; A brick: checks the ball in each frame, after the ball moved, and ends
+;; when the ball hits it, which bounces.
+task Brick (i, j) {
+    val x, y = (j*BW) + (BW/2), (i*BH) + 50
+    val near = func (a, b) { math.abs(f32(a - b)) < ((BW/2) + 4) }    ;; 4 is radius*2/3
+    par :any {
+        loop on :rl.frame {
+            ifs {
+                ((ball.y - R) <= (y + (BH/2))) && ((ball.y - R) > ((y + (BH/2)) + ball.sy)) && near(ball.x, x) && (ball.sy < 0) => {
+                    set ball.sy = -ball.sy
+                    break
+                }
+                ((ball.y + R) >= (y - (BH/2))) && ((ball.y + R) < ((y - (BH/2)) + ball.sy)) && near(ball.x, x) && (ball.sy > 0) => {
+                    set ball.sy = -ball.sy
+                    break
+                }
+                (f32(ball.x + R) >= (x - (BW/2))) && (f32(ball.x + R) < f32((x - (BW/2)) + ball.sx)) && near(ball.y, y) && (ball.sx > 0) => {
+                    set ball.sx = -ball.sx
+                    break
+                }
+                (f32(ball.x - R) <= (x + (BW/2))) && (f32(ball.x - R) > f32((x + (BW/2)) + ball.sx)) && near(ball.y, y) && (ball.sx < 0) => {
+                    set ball.sx = -ball.sx
+                    break
+                }
+            }
+        }
+        set bricks_left -= 1
+    } with {
+        val c = if ((i + j) % 2) == 0 => rl.GRAY => rl.DARKGRAY
+        loop on :rl.draw {
+            rl.rectangle(x - (BW/2), y - (BH/2), BW, BH, c)
+        }
+    }
+}
+
+;; One game: ends when the bricks or the lives are over.
+task Play () {
+    set player = [x=W//2, y=(H*7)//8]
+    set ball   = [x=player.x, y=(player.y - 10) - R, sx=0, sy=0]
+    set life   = LIVES
+    set bricks_left = ROWS * COLS
+    spawn Player()
+    pin b = spawn Ball()
+    pin bricks = tasks()
+    loop i in ROWS {
+        loop j in COLS {
+            spawn @bricks Brick(i, j)
+        }
+    }
+    await <(b) || :all bricks>
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %s %.1f %.5f %.1f %.5f %.1f %d %d", rl.frame(), phase,
+                player.x, ball.x, ball.y, ball.sx, ball.sy, life, bricks_left))
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)

@@ -20,3 +20,4 @@ the runs: no number here is typed by hand.
 | snake | 181 | 127 | 1509 | 938 | 5 | 0 | 2 (1220 frames, 16 screens) | yes |
 | floppy | 143 | 120 | 1054 | 701 | 4 | 0 | 2 (2746 frames, 25 screens) | yes |
 | gold_fever | 178 | 165 | 1470 | 1237 | 6 | 1 | 2 (1369 frames, 27 screens) | yes |
+| arkanoid | 207 | 150 | 2005 | 1312 | 4 | 0 | 2 (22977 frames, 23 screens) | yes |

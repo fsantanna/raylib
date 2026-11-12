@@ -1,3 +1,33 @@
+diff --git a/classics/src/arkanoid.c b/classics/src/arkanoid.c
+index b5fd3c9..91ee5a0 100644
+--- a/classics/src/arkanoid.c
++++ b/classics/src/arkanoid.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <time.h>
+@@ -267,6 +270,15 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        int left = 0;
++        for (int i = 0; i < LINES_OF_BRICKS; i++) for (int j = 0; j < BRICKS_PER_LINE; j++) left += brick[i][j].active;
++        printf("%d %s %.1f %.5f %.1f %.5f %.1f %d %d\n", RltFrame(), gameOver? "over" : (pause? "pause" : "play"),
++            player.position.x, ball.position.x, ball.position.y, ball.speed.x, ball.speed.y, player.life, left);
++    }
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/floppy.c b/classics/src/floppy.c
 index 72881fc..f35bc66 100644
 --- a/classics/src/floppy.c

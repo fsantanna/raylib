@@ -15,6 +15,10 @@ Seen and expected, as the manual says, listed for whoever writes a port:
 - A native literal with a single backquote is one line: longer C goes to
   the `:prelude`.
 - `on` is a keyword, so it cannot be a variable.
+- A plain `par` never rejoins, even when a branch ends: a task whose life
+  is one branch needs `par :any`.
+- A `func` inside a task must be `val func`; the parameters of a task are
+  constants (copy them to a `var` to move).
 
 To watch, as the plan asks: the cost of a native call per shape drawn, the
 cost of small records passed to C, an environment that ticks in frames as

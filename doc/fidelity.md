@@ -117,3 +117,27 @@ C. The checks of the gold, the enemy, and the home are one task, the last,
 which emits `:touch.gold` and `:touch.home` in the order of the C. As in the
 C, a game that ends still checks the home in that frame: a point scored
 there is not in the best score.
+
+## arkanoid
+
+Same as the original on its runs `win` (21460 frames, 11 screens: the
+paddle keeps the ball for 21429 frames, until no brick is left, with all
+lives) and `lose` (1517 frames, 12 screens: a pause, eight bounces, then
+five falls, an ENTER in the frame of the game over, a restart).
+
+Trace: frame, phase, paddle, ball (position and speed, with 5 decimals),
+lives, bricks left.
+
+- **Floats.** After a bounce on the paddle, the speed of the ball is
+  `(ball.x - player.x)/40*5`, in floats of 32 bits, and the position adds
+  it in each frame: 2.98828, 0.04883. Atmos numbers are doubles, so the port
+  rounds the result of each such operation with `rl.f32`, as the C does,
+  including the sums that are only compared (`ball.x + radius >= 800`).
+  The run `win` goes through hundreds of bounces with the same positions,
+  to the last decimal of the trace.
+- In the first game, `InitGame` places the ball with a radius of 0 (it is
+  set after), but the first frame places it again on the paddle, so this is
+  never seen.
+- As in the C, the bricks are checked in their order, after the ball moved,
+  and a hit changes the speed that the next bricks see. The bricks are a
+  pool of tasks, spawned row by row, which run in that order.
