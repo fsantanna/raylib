@@ -35,6 +35,12 @@ that is checked, and what differs, game by game.
 - **Screenshots.** The software renderer gives its frame buffer in BGRA
   (`RLSW_FRAMEBUFFER_OUTPUT_BGRA`). The test mode turns it back to RGBA
   before saving.
+- **Keys from 260 up.** The memory platform of raylib kept the previous
+  state only of the keys below 260 ("Android supports up to 260 keys"), so
+  the arrows (262 to 265) were pressed in every frame and never released.
+  The patch copies all `MAX_KEYBOARD_KEYS`, as the desktop platform does.
+  This changes the originals too: without it, `IsKeyPressed(KEY_RIGHT)` is
+  true while the key is held.
 - **Audio.** The container has no sound card: raylib fails to open the
   device, and sounds and music do nothing, in the original and in the port
   alike. No game reads the state of the audio in its logic (no

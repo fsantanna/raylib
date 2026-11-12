@@ -10,11 +10,14 @@ if a.size != b.size:
     print("sizes differ: %s %s" % (a.size, b.size))
     sys.exit(1)
 d = ImageChops.difference(a, b)
-box = d.getbbox()
+box = d.getbbox(alpha_only=False)
 if box is None:
     print("same")
     sys.exit(0)
-n = sum(1 for p in d.getdata() if p != (0, 0, 0, 0))
-d.convert("RGB").point(lambda v: 255 if v else 0).save(sys.argv[2][:-4] + ".diff.png")
+r, g, b_, al = d.split()
+mask = ImageChops.lighter(ImageChops.lighter(r, g), ImageChops.lighter(b_, al))
+mask = mask.point(lambda v: 255 if v else 0)
+n = mask.histogram()[255]
+mask.save(sys.argv[2][:-4] + ".diff.png")
 print("%d pixels differ, in %s" % (n, box))
 sys.exit(1)

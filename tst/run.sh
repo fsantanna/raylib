@@ -25,4 +25,15 @@ else
     fail rlt
 fi
 
+# the driver of raylib.atm
+"$ROOT/tools/atmos.sh" tst/env/env.atm "$OUT/env" || fail "env (build)"
+(cd "$OUT" && RL_FRAMES=300 RL_SEED=7 \
+    RL_INPUT=10:dn:RIGHT,40:up:RIGHT,50:dn:P,51:up:P,60:mv:30:40,60:md:0,61:mu:0 \
+    RL_SHOT=45:env.png ./env 2>/dev/null) > "$OUT/env.out"
+if diff -u tst/env/env.out "$OUT/env.out" && cmp -s tst/env/env.png "$OUT/env.png"; then
+    ok env
+else
+    fail env
+fi
+
 exit $FAIL
