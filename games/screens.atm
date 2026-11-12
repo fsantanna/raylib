@@ -115,22 +115,28 @@ val FADE_BLACK = [                      ;; repair and others
 ]
 
 ;; The screens, by name, from the first one, with a fade (FADE_WHITE by
-;; default).
+;; default). Its `pub` tells, for a trace, the screen (`name`), whether a
+;; transition is on (`trans`), and its alpha, as the C has them: the alpha
+;; goes up to 1 exactly, at the change, and down to 0.
 task Screens (screens, first, fade) {
     val f = if fade => fade => FADE_WHITE
     var name = first
     var fresh = false
+    set pub = [name=first, trans=false, alpha=0]
     loop {
+        set pub.name = name
         pin s = spawn (screens@name)()
         if fresh {
             ;; under the fade, which goes back; the screen is drawn, and
             ;; updates from the frame after the fade is gone
             toggle s(false) with :rl.draw
             var alpha = 1
+            set pub.alpha = 1
             par :any {
                 loop {
                     await :rl.frame
                     set alpha = rl.f32(alpha - f.dec)
+                    set pub.alpha = alpha
                     until f.back(alpha)
                 }
             } with {
@@ -138,6 +144,7 @@ task Screens (screens, first, fade) {
                     rl.rectangle(0, 0, rl.width(), rl.height(), rl.fade(f.color, alpha))
                 }
             }
+            set pub.trans, pub.alpha = false, 0
             toggle s(true)
         }
         await :rl.frame until s.pub
@@ -149,6 +156,7 @@ task Screens (screens, first, fade) {
         ;; the fade, over the screen, which is drawn but no more updated
         toggle s(false) with :rl.draw
         var alpha = 0
+        set pub.trans = true
         spawn {
             loop on :rl.draw {
                 rl.rectangle(0, 0, rl.width(), rl.height(), rl.fade(f.color, alpha))
@@ -157,6 +165,7 @@ task Screens (screens, first, fade) {
         loop {
             await :rl.frame
             set alpha = rl.f32(alpha + f.inc)
+            set pub.alpha = alpha
             until f.into(alpha)
         }
         set name, fresh = s.pub, true
