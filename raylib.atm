@@ -377,6 +377,12 @@ val rl = [
         `:number.float (double)(float)a_dbl($x)`
     },
 
+    ;; the functions of C on floats, which may differ from the doubles of
+    ;; math.sin and the like in the last bit
+    sinf = func (x) { `:number.float (double)sinf((float)a_dbl($x))` },
+    cosf = func (x) { `:number.float (double)cosf((float)a_dbl($x))` },
+    tanf = func (x) { `:number.float (double)tanf((float)a_dbl($x))` },
+
     ;; rl.random(min, max): GetRandomValue, both included
     random = func (min, max) {
         `:number GetRandomValue(RL_I($min), RL_I($max))`

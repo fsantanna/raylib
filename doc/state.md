@@ -93,3 +93,22 @@ Left in the port for the trace only: `phase`.
 
 Left in the port for the trace only: `phase`, and `bricks_left`, the number
 of bricks, which the C counts in its trace.
+
+## asteroids_survival
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `framesCounter` | score: the time survived, shown as seconds | `time`, counted by a task, first in each frame as in the C |
+| `gameOver` | control | `Play` awaits `:over`, which a meteor emits when it touches the ship |
+| `pause` | control | `Classic` |
+| `shipHeight` | constant | `SHIP_H` |
+| `player.position`, `player.rotation`, `player.acceleration` | drawn, and data | `ship` |
+| `player.speed` | data, computed from the rotation in each frame | `sx`, `sy`, local to the frame |
+| `player.collider` | data | `ship.cx`, `ship.cy` (its radius is the constant `12`) |
+| `player.color` | constant, never used | gone |
+| `mediumMeteor[]`, `smallMeteor[]` `.position`, `.speed` | drawn, and data | `m`, given to each `Meteor` |
+| `mediumMeteor[]`, `smallMeteor[]` `.active` | control: always true, so the faded drawing never happens | gone: a meteor is a task, alive for the whole game |
+| `.radius`, `.color` | constant (the color is never used) | `r`, `color` |
+
+Left in the port for the trace only: `phase`.

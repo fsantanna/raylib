@@ -141,3 +141,30 @@ lives, bricks left.
 - As in the C, the bricks are checked in their order, after the ball moved,
   and a hit changes the speed that the next bricks see. The bricks are a
   pool of tasks, spawned row by row, which run in that order.
+
+## asteroids_survival
+
+Same as the original on its runs `survive` (3031 frames, 15 screens: the
+ship avoids the meteors for 2500 frames with a pause, then a meteor hits it;
+an ENTER in the frame of the game over, a restart, a second game with no
+input) and `seed3` (1500 frames, 7 screens: other meteors).
+
+Trace: frame, phase, ship (position and acceleration with 6 decimals,
+rotation), time.
+
+- **Floats.** The ship mixes `sin` and `cos` on doubles with stores on
+  floats, and draws with `sinf` and `cosf`; its height comes from `tanf`.
+  The port rounds as the C does (`rl.f32`) and calls the functions on
+  floats of C (`rl.sinf`, `rl.cosf`, `rl.tanf`). A first version used
+  `H + shipHeight` as a double where the C adds them on floats: the ship
+  crossed the border at frame 756 with a y that differed in the fifth
+  decimal, and the trace showed it.
+- **`correctRange`.** `InitGame` does not reset it after the speeds, so only
+  the first meteor draws its x again while it is near the center; the
+  others keep their first x. The port keeps this, since it decides the
+  random draws that follow.
+- In the frame a meteor touches the ship, the C still moves the meteors;
+  the port ends the game at once. They are not drawn after the game, and the
+  next game places them again, so nothing shows it.
+- The time is counted first in the frame, as the C does, so that the frame
+  of the game over counts.
