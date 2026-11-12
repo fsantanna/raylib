@@ -38,4 +38,4 @@ the runs: no number here is typed by hand.
 | drturtle | 293 | 222 | 2416 | 1891 | 4 | 1 | 2 (3700 frames, 17 screens) | yes |
 | just_do | 1454 | 707 | 9350 | 6548 | 5 | 4 | 2 (4801 frames, 47 screens) | yes |
 | skully_escape | 2685 | 682 | 18429 | 6161 | 6 | 3 | 3 (11514 frames, 60 screens) | yes |
-| retro_maze_3d | 497 | 433 | 4185 | 3336 | None | None | 1 (700 frames, 20 screens) | no |
+| retro_maze_3d | 497 | 433 | 4185 | 3336 | 5 | 4 | 3 (7092 frames, 58 screens) | yes |
