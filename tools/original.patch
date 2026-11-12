@@ -1237,3 +1237,219 @@ index 0df3819..a890f59 100644
      BeginTextureMode(screenTarget);
          ClearBackground(GB_GREEN01);
  
+diff --git a/koala_seasons/src/koala_seasons.c b/koala_seasons/src/koala_seasons.c
+index 06c3d10..b73edad 100644
+--- a/koala_seasons/src/koala_seasons.c
++++ b/koala_seasons/src/koala_seasons.c
+@@ -13,7 +13,12 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
+-#include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++#include "screens.h"
++void TraceTitleScreen(void);       // Atmos port: trace
++void TraceGameplayScreen(void);
++void TraceEndingScreen(void);    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #if defined(PLATFORM_WEB)
+     #include <emscripten/emscripten.h>
+@@ -295,6 +300,20 @@ void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        printf("%d %d %d %.4f %d |", RltFrame(), currentScreen, onTransition, transAlpha, transToScreen);
++        switch (currentScreen)
++        {
++            case TITLE: TraceTitleScreen(); break;
++            case GAMEPLAY: TraceGameplayScreen(); break;
++            case ENDING: TraceEndingScreen(); break;
++            default: break;
++        }
++        printf("\n");
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(WHITE);
+diff --git a/koala_seasons/src/screen_ending.c b/koala_seasons/src/screen_ending.c
+index b02f889..9991993 100644
+--- a/koala_seasons/src/screen_ending.c
++++ b/koala_seasons/src/screen_ending.c
+@@ -24,6 +24,8 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "screens.h"
+ 
+ #include <stdio.h>
+@@ -527,4 +529,13 @@ void UnloadEndingScreen(void)
+ int FinishEndingScreen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the ending, after its logic
++void TraceEndingScreen(void)
++{
++    int c = 0; double sx = 0, sy = 0, sr = 0, sa = 0, ss = 0;
++    for (int i = 0; i < 20; i++) if (leafParticles[i].active) { c++; sx += leafParticles[i].position.x; sy += leafParticles[i].position.y; sr += leafParticles[i].rotation; sa += leafParticles[i].alpha; ss += leafParticles[i].size; }
++    int k = 0; for (int i = 0; i < MAX_KILLS; i++) k += active[i];
++    printf(" %d %d %d %d %d %.4f %d %d %d %d %08x %d:%.3f:%.3f:%.3f:%.3f:%.3f", endingCounter, framesCounter, seasonsCounter, currentLeavesEnding, currentScore, clockRotation,
++        replaying, replayTimer, framesKillsCounter, k, *(unsigned int *)&buttonPlayColor, c, sx, sy, sr, sa, ss);
++}
+diff --git a/koala_seasons/src/screen_gameplay.c b/koala_seasons/src/screen_gameplay.c
+index 7f075e3..85bce0e 100644
+--- a/koala_seasons/src/screen_gameplay.c
++++ b/koala_seasons/src/screen_gameplay.c
+@@ -27,6 +27,8 @@
+ // Defines and Macros
+ //----------------------------------------------------------------------------------
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "screens.h"
+ 
+ #include <time.h>
+@@ -437,7 +439,8 @@ static void Reset(void);
+ void InitGameplayScreen(void)
+ {
+     // Get current time at the moment of running game
+-    time(&rawtime);
++    if (RltFrame() > 0) rawtime = 1700000000;   // Atmos port: a fixed date in the test mode
++    else time(&rawtime);
+     ptm = gmtime(&rawtime);
+ 
+     currentMonth = ptm->tm_mon;
+@@ -3902,3 +3905,73 @@ static void Reset(void)
+ 
+     textSize = MeasureTextEx(font, "3", font.baseSize*5, 2);
+ }
++
++// Atmos port: trace of the gameplay, after its logic
++static void TraceSystem(Particle *p, int n, bool active, int spawnTime, int maxTime)
++{
++    int c = 0; double sx = 0, sy = 0, sr = 0, sa = 0;
++    for (int i = 0; i < n; i++) if (p[i].active) { c++; sx += p[i].position.x; sy += p[i].position.y; sr += p[i].rotation; sa += p[i].alpha + p[i].size; }
++    printf(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", active, spawnTime, maxTime, c, sx, sy, sr, sa);
++}
++static void TraceRects(Rectangle *r, bool *a, int n)
++{
++    int m = 0; double sx = 0, sy = 0;
++    for (int i = 0; i < n; i++) { if (a[i]) m |= 1 << i; sx += r[i].x; sy += r[i].y; }
++    printf(" %x:%.3f:%.3f", m, sx, sy);
++}
++static unsigned int TraceColor(Color c) { return (c.r << 24) | (c.g << 16) | (c.b << 8) | c.a; }
++void TraceGameplayScreen(void)
++{
++    printf(" %d %d %d %d %d %d | %.4f %.4f %d %.4f %.4f %d %d %d | %d %d %d %d %d %d | %d %d %d %d %d %d %d %d",
++        state, season, play, playerActive, transforming, finishScreen,
++        playerBounds.x, playerBounds.y, velocity, gravity, speedMod, speed, jumpSpeed, grabCounter,
++        currentLeaves, score, power, killer, killCounter, startCounter,
++        currentMonth, monthTimer, seasonTimer, bambooTimer, bambooSpawnTime, eagleDelay, globalFrameCounter, seasons);
++    printf(" | %.4f %.4f %.4f %d %d %.4f %.4f %.4f %.4f %.4f %d %d %d %d %d %d %d %d %d",
++        scrollFront, scrollMiddle, scrollBack, fogPosition, (int)groundPos, clockRotation, clockSpeedRotation, fogAlpha, filterAlpha, UIfade,
++        onIce, onResin, onWind, coolDown, windCounter, resinCount, transCount, randomMessage, rainChance);
++    printf(" | %08x %08x %08x %08x %08x %.4f %.4f %.4f %.4f %.4f", TraceColor(color00), TraceColor(color01), TraceColor(color02), TraceColor(color03), TraceColor(finalColor),
++        numberAlpha, numberScale, leafGUIglowFade, leafGUIpulseFade, leafGUIpulseScale);
++    printf(" |");
++    TraceRects(bamboo, bambooActive, MAX_BAMBOO);
++    TraceRects(snake, snakeActive, MAX_ENEMIES);
++    TraceRects(dingo, dingoActive, MAX_ENEMIES);
++    TraceRects(owl, owlActive, MAX_ENEMIES);
++    TraceRects(leaf, leafActive, MAX_LEAVES);
++    TraceRects(fire, fireActive, MAX_FIRE);
++    TraceRects(ice, iceActive, MAX_ICE);
++    TraceRects(resin, resinActive, MAX_RESIN);
++    TraceRects(wind, windActive, MAX_WIND);
++    { int h = 0; for (int i = 0; i < MAX_ENEMIES; i++) h |= (isHitSnake[i] << i) | (isHitDingo[i] << (i + 16)); printf(" %x", h); }
++    printf(" B%d%d%d:%.3f:%.3f E%d%d%d%d:%.3f:%.3f A%.3f:%.3f:%.3f:%.3f:%.3f:%.3f", beeActive, isHitBee, alertBeeActive, bee.x, bee.y,
++        eagleActive, isHitEagle, alertActive, eagleAlert, eagle.x, eagle.y, alertRectangle.x, alertRectangle.y, alertRectangle.height, beeAlertRectangle.x, beeAlertRectangle.y, beeAlertRectangle.height);
++    printf(" |");
++    TraceSystem(snowParticle.particles, MAX_PARTICLES, snowParticle.active, snowParticle.spawnTime, snowParticle.maxTime);
++    TraceSystem(backSnowParticle.particles, MAX_PARTICLES, backSnowParticle.active, backSnowParticle.spawnTime, backSnowParticle.maxTime);
++    TraceSystem(planetreeParticle.particles, MAX_PARTICLES, planetreeParticle.active, planetreeParticle.spawnTime, planetreeParticle.maxTime);
++    TraceSystem(backPlanetreeParticle.particles, MAX_PARTICLES, backPlanetreeParticle.active, backPlanetreeParticle.spawnTime, backPlanetreeParticle.maxTime);
++    TraceSystem(dandelionParticle.particles, MAX_PARTICLES, dandelionParticle.active, dandelionParticle.spawnTime, dandelionParticle.maxTime);
++    TraceSystem(dandelionBackParticle.particles, MAX_PARTICLES, dandelionBackParticle.active, dandelionBackParticle.spawnTime, dandelionBackParticle.maxTime);
++    TraceSystem(flowerParticle.particles, MAX_PARTICLES, flowerParticle.active, flowerParticle.spawnTime, flowerParticle.maxTime);
++    TraceSystem(backFlowerParticle.particles, MAX_PARTICLES, backFlowerParticle.active, backFlowerParticle.spawnTime, backFlowerParticle.maxTime);
++    TraceSystem(rainParticle.particles, MAX_PARTICLES, rainParticle.active, rainParticle.spawnTime, rainParticle.maxTime);
++    TraceSystem(backRainParticle.particles, MAX_PARTICLES, backRainParticle.active, backRainParticle.spawnTime, backRainParticle.maxTime);
++    TraceSystem(rainStormParticle.particles, MAX_PARTICLES_STORM, rainStormParticle.active, rainStormParticle.spawnTime, rainStormParticle.maxTime);
++    TraceSystem(snowStormParticle.particles, MAX_PARTICLES_STORM, snowStormParticle.active, snowStormParticle.spawnTime, snowStormParticle.maxTime);
++    {
++        int c = 0; double sx = 0, sa = 0;
++        for (int i = 0; i < MAX_PARTICLES_RAY; i++) { if (rayParticles.particles[i].active) { c++; sx += rayParticles.particles[i].position.x; sa += rayParticles.particles[i].alpha + rayParticles.particles[i].delayCounter; }
++                                                     if (backRayParticles.particles[i].active) { c += 100; sx += backRayParticles.particles[i].position.x; sa += backRayParticles.particles[i].alpha + backRayParticles.particles[i].delayCounter; } }
++        printf(" R%d:%d:%d:%d:%d:%.3f:%.3f", rayParticles.active, rayParticles.spawnTime, rayParticles.maxTime, backRayParticles.spawnTime, c, sx, sa);
++        c = 0; sx = 0; sa = 0;
++        for (int i = 0; i < MAX_PARTICLES_SPEED; i++) if (speedFX.particle[i].active) { c++; sx += speedFX.particle[i].position.x + speedFX.particle[i].position.y; sa += speedFX.particle[i].alpha + speedFX.particle[i].size.y; }
++        printf(" S%d:%d:%d:%d:%.3f:%.3f", speedFX.active, speedFX.spawnTime, speedFX.maxTime, c, sx, sa);
++        c = 0; sx = 0; sa = 0;
++        for (int i = 0; i < MAX_LEAVES; i++) if (leafParticles[i].active) for (int j = 0; j < 32; j++) { c++; sx += leafParticles[i].particles[j].position.x + leafParticles[i].particles[j].position.y; sa += leafParticles[i].particles[j].alpha + leafParticles[i].particles[j].size + leafParticles[i].particles[j].rotation; }
++        printf(" L%d:%.3f:%.3f", c, sx, sa);
++        c = 0; sx = 0; sa = 0;
++        for (int i = 0; i < MAX_ENEMIES; i++) { if (enemyHit[i].active) { c++; sa += enemyHit[i].alpha + enemyHit[i].size; } if (popupScore[i].active) { c += 100; sx += popupScore[i].position.x + popupScore[i].position.y + popupScore[i].scale + popupScore[i].alpha; } }
++        for (int i = 0; i < MAX_LEAVES; i++) if (popupLeaves[i].active) { c += 10000; sx += popupLeaves[i].position.x + popupLeaves[i].position.y + popupLeaves[i].scale + popupLeaves[i].alpha; }
++        printf(" P%d:%.3f:%.3f", c, sx, sa);
++    }
++}
+diff --git a/koala_seasons/src/screen_title.c b/koala_seasons/src/screen_title.c
+index 087e5a0..b1eb693 100644
+--- a/koala_seasons/src/screen_title.c
++++ b/koala_seasons/src/screen_title.c
+@@ -24,6 +24,8 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "screens.h"
+ 
+ #include <math.h>
+@@ -1074,4 +1076,35 @@ static float BounceEaseOut(float t,float b , float c, float d)
+         float postFix = t-=(2.625f/2.75f);
+         return c*(7.5625f*(postFix)*t + 0.984375f) + b;
+     }
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the title, after its logic
++static void TraceSystem(Particle *p, int n, bool active, int spawnTime, int maxTime)
++{
++    int c = 0; double sx = 0, sy = 0, sr = 0, sa = 0;
++    for (int i = 0; i < n; i++) if (p[i].active) { c++; sx += p[i].position.x; sy += p[i].position.y; sr += p[i].rotation; sa += p[i].alpha; }
++    printf(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", active, spawnTime, maxTime, c, sx, sy, sr, sa);
++}
++static void TraceRays(RayParticle *p, int n, bool active, int spawnTime, int maxTime)
++{
++    int c = 0; double sx = 0, sa = 0, ss = 0, sd = 0;
++    for (int i = 0; i < n; i++) if (p[i].active) { c++; sx += p[i].position.x; sa += p[i].alpha; ss += p[i].size; sd += p[i].delayCounter + 100*p[i].fading; }
++    printf(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", active, spawnTime, maxTime, c, sx, sa, ss, sd);
++}
++void TraceTitleScreen(void)
++{
++    printf(" %d %d %d %d %.4f %.4f %d %d %d %d", framesCounter, globalFrameCounter, currentFrame, thisFrame, currentValue1, currentValue2, initSeason, rainChance, parallaxBackOffset, parallaxFrontOffset);
++    TraceSystem(snowParticle.particle, MAX_particle, snowParticle.active, snowParticle.spawnTime, snowParticle.maxTime);
++    TraceSystem(backSnowParticle.particle, MAX_particle, backSnowParticle.active, backSnowParticle.spawnTime, backSnowParticle.maxTime);
++    TraceSystem(planetreeParticle.particle, MAX_particle, planetreeParticle.active, planetreeParticle.spawnTime, planetreeParticle.maxTime);
++    TraceSystem(backPlanetreeParticle.particle, MAX_particle, backPlanetreeParticle.active, backPlanetreeParticle.spawnTime, backPlanetreeParticle.maxTime);
++    TraceSystem(dandelionParticle.particle, MAX_particle, dandelionParticle.active, dandelionParticle.spawnTime, dandelionParticle.maxTime);
++    TraceSystem(dandelionBackParticle.particle, MAX_particle, dandelionBackParticle.active, dandelionBackParticle.spawnTime, dandelionBackParticle.maxTime);
++    TraceSystem(flowerParticle.particle, MAX_particle, flowerParticle.active, flowerParticle.spawnTime, flowerParticle.maxTime);
++    TraceSystem(backFlowerParticle.particle, MAX_particle, backFlowerParticle.active, backFlowerParticle.spawnTime, backFlowerParticle.maxTime);
++    TraceSystem(rainParticle.particle, MAX_particle, rainParticle.active, rainParticle.spawnTime, rainParticle.maxTime);
++    TraceSystem(backRainParticle.particle, MAX_particle, backRainParticle.active, backRainParticle.spawnTime, backRainParticle.maxTime);
++    TraceSystem(rainStormParticle.particle, 1024, rainStormParticle.active, rainStormParticle.spawnTime, rainStormParticle.maxTime);
++    TraceSystem(snowStormParticle.particle, 256, snowStormParticle.active, snowStormParticle.spawnTime, snowStormParticle.maxTime);
++    TraceRays(rayparticle.particle, 20, rayparticle.active, rayparticle.spawnTime, rayparticle.maxTime);
++    TraceRays(backRayparticle.particle, 20, backRayparticle.active, backRayparticle.spawnTime, backRayparticle.maxTime);
++}
