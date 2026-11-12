@@ -498,6 +498,9 @@ val rl = [
     rectangle_lines = func (x, y, w, h, c) {
         `DrawRectangleLines(RL_I($x), RL_I($y), RL_I($w), RL_I($h), rl_color($c));`
     },
+    poly = func (x, y, sides, r, rot, c) {
+        `DrawPoly((Vector2){RL_F($x),RL_F($y)}, RL_I($sides), RL_F($r), RL_F($rot), rl_color($c));`
+    },
     triangle = func (x1, y1, x2, y2, x3, y3, c) {
         `DrawTriangle((Vector2){RL_F($x1),RL_F($y1)}, (Vector2){RL_F($x2),RL_F($y2)}, (Vector2){RL_F($x3),RL_F($y3)}, rl_color($c));`
     },
