@@ -506,6 +506,10 @@ val rl = [
     text = func (s, x, y, size, c) {
         `DrawText(rl_s($s), RL_I($x), RL_I($y), RL_I($size), rl_color($c));`
     },
+    ;; rl.text_subtext(s, pos, len): TextSubtext, in bytes
+    text_subtext = func (s, pos, len) {
+        `:string TextSubtext(rl_s($s), RL_I($pos), RL_I($len))`
+    },
     measure = func (s, size) {
         `:number MeasureText(rl_s($s), RL_I($size))`
     },
@@ -554,8 +558,9 @@ val rl = [
         `Font rl_f = LoadFont(rl_s($path));`
         `:value rl_box(&rl_f, sizeof(rl_f), rl_fnt_fin, RL_KIND_FNT)`
     },
-    font_ex = func (path, size) {
-        `Font rl_f = LoadFontEx(rl_s($path), RL_I($size), NULL, 0);`
+    ;; rl.font_ex(path, size [, glyphs]): a TTF at a size (LoadFontEx)
+    font_ex = func (path, size, glyphs) {
+        `Font rl_f = LoadFontEx(rl_s($path), RL_I($size), NULL, a_isnum($glyphs) ? RL_I($glyphs) : 0);`
         `:value rl_box(&rl_f, sizeof(rl_f), rl_fnt_fin, RL_KIND_FNT)`
     },
     font_size = func (f) { `:number rl_font($f).baseSize` },

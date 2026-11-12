@@ -1,0 +1,6 @@
+# The two logos, the title, ENTER; the mission skipped and sent on; the
+# gameplay with a word dragged and dropped outside the message.
+FRAMES=1900
+SEED=1
+INPUT=1100:dn:ENTER,1101:up:ENTER,1300:dn:ENTER,1301:up:ENTER,1450:dn:ENTER,1451:up:ENTER,1600:mv:1150:620,1700:mv:180:220,1701:md:0,1720:mv:700:400,1740:mu:0
+SHOTS="1 400 600 800 1000 1100 1150 1250 1350 1400 1452 1500 1560 1600 1701 1730 1741 1800 1900"

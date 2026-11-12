@@ -1,0 +1,588 @@
+;; Transmission Mission (GGJ18), by Ramon Santamaria (@raysan5) and the team
+;; credited in README.original.md, zlib license. The art and sound are
+;; those of the original.
+;;
+;; Ported to Atmos: an altered version of `transmission/src/*.c` of
+;; raysan5/raylib-games. The game is the same; the screens, the logos, the
+;; typing of the title and of the mission (six flags and a counter in the
+;; C), the blinking keyword, the drag of the words, and the spinning
+;; newspaper are tasks and awaits. What builds data from the files and the
+;; images (the missions, the atlas of words, the layout of the message, the
+;; headline) is the C of the original, in the prelude below.
+
+include "../../raylib.atm"
+include "../screens.atm"
+
+```:prelude
+#define MAX_CODING_WORDS    12
+#define MAX_MISSION_WORDS    8
+typedef struct Word { int id; Rectangle rec; Rectangle iniRec; bool hover; bool picked; char text[32]; } Word;
+typedef struct Mission { int id; char brief[512]; char key[32]; char msg[256]; int wordsCount; int sols[10]; } Mission;
+
+static Word messageWords[MAX_MISSION_WORDS] = { 0 };    // never reset: a shorter word keeps the tail of the last one
+static const char *codingWords[MAX_CODING_WORDS] = {
+    "pollo\0", "conejo\0", "huevo\0", "nido\0", "aire\0", "armario\0",
+    "agujero\0", "platano\0", "pastel\0", "mercado\0", "raton\0", "melon\0"
+};
+
+static Mission *LoadMissions(const char *fileName)
+{
+    Mission *missions = NULL;
+    char buffer[512];
+    int missionsCount = 0;
+    FILE *misFile = fopen(fileName, "rt");
+    if (misFile == NULL) printf("[%s] Missions file could not be opened\n", fileName);
+    else
+    {
+        while (!feof(misFile))
+        {
+            fgets(buffer, 512, misFile);
+            switch (buffer[0]) { case 't': sscanf(buffer, "t %i", &missionsCount); break; default: break; }
+        }
+        if (missionsCount > 0) missions = (Mission *)malloc(missionsCount*sizeof(Mission));
+        else return NULL;
+        rewind(misFile);
+        int missionNum = 0;
+        while (!feof(misFile))
+        {
+            fgets(buffer, 512, misFile);
+            if (missionNum < missionsCount)
+            {
+                switch (buffer[0])
+                {
+                    case 'b': { missions[missionNum].id = missionNum; sscanf(buffer, "b %[^\n]s", missions[missionNum].brief); } break;
+                    case 'k': sscanf(buffer, "k %[^\n]s", missions[missionNum].key); break;
+                    case 'm': { sscanf(buffer, "m %[^\n]s", missions[missionNum].msg); } break;
+                    case 's':
+                    {
+                        sscanf(buffer, "s %i %i %i %i %i %i %i %i",
+                            &missions[missionNum].sols[0], &missions[missionNum].sols[1], &missions[missionNum].sols[2], &missions[missionNum].sols[3],
+                            &missions[missionNum].sols[4], &missions[missionNum].sols[5], &missions[missionNum].sols[6], &missions[missionNum].sols[7]);
+                        missions[missionNum].wordsCount = 0;
+                        for (int i = 0; i < 8; i++) if (missions[missionNum].sols[i] > -1) missions[missionNum].wordsCount++;
+                        TraceLog(LOG_WARNING, "Mission %i - Words count %i", missionNum, missions[missionNum].wordsCount);
+                        missionNum++;
+                    } break;
+                    default: break;
+                }
+            }
+        }
+        if (missionsCount != missionNum) TraceLog(LOG_WARNING, "Missions count and loaded missions don't match!");
+    }
+    fclose(misFile);
+    if (missions != NULL) { TraceLog(LOG_INFO, "Missions loaded: %i", missionsCount); TraceLog(LOG_INFO, "Missions loaded successfully!"); }
+    return missions;
+}
+
+// The missions of each screen, loaded when the screen starts, as in the C.
+static Mission *tmMission = NULL, *tmGameplay = NULL, *tmEnding = NULL;
+
+// InitMissionScreen: the brief with its lines broken, the keyword, and the
+// height of the brief.
+static AVal tm_mission (int cur, AVal font) {
+    free(tmMission);
+    tmMission = LoadMissions("resources/missions.txt");
+    int max = strlen(tmMission[cur].brief);
+    printf("Current mission %i: %s (length: %i)\n", cur, tmMission[cur].brief, max);
+    int line = 1, i = line*75;
+    while (i < max) {
+        if (tmMission[cur].brief[i] == ' ') { tmMission[cur].brief[i] = '\n'; line++; i = line*75; }
+        else i++;
+    }
+    AVal t = a_tab();
+    rl_set(t, "brief", a_strz(tmMission[cur].brief));
+    rl_set(t, "key", a_strz(tmMission[cur].key));
+    rl_set(t, "max", a_int(max));
+    rl_set(t, "h", a_num(MeasureTextEx(rl_font(font), tmMission[cur].brief, 30, 0).y));
+    return t;
+}
+
+// InitGameplayScreen: the atlas of the words, the message with its lines
+// broken, and the places of the words in the message (messageWords).
+static AVal tm_gameplay (int cur, AVal fnt) {
+    Font fontMessage = rl_font(fnt);
+    Image imWordsBase = LoadImage("resources/textures/words_base.png");
+    Image imWords = GenImageColor(imWordsBase.width, imWordsBase.height*MAX_CODING_WORDS, WHITE);
+    for (int i = 0; i < MAX_CODING_WORDS; i++) {
+        ImageDrawImage(&imWords, imWordsBase, 0, imWordsBase.height*i, WHITE);
+        ImageDrawTextEx(&imWords, fontMessage, codingWords[i], (Vector2){ imWordsBase.width/2 - MeasureTextEx(fontMessage, codingWords[i],
+                        fontMessage.baseSize, 0).x/2, imWordsBase.height*i }, fontMessage.baseSize, 0, BLACK);
+    }
+    Texture2D texWordsAtlas = LoadTextureFromImage(imWords);
+    UnloadImage(imWordsBase);
+    UnloadImage(imWords);
+    free(tmGameplay);
+    tmGameplay = LoadMissions("resources/missions.txt");
+    TraceLog(LOG_WARNING, "Words count %i", tmGameplay[cur].wordsCount);
+    char *msg = tmGameplay[cur].msg;
+    int msgLen = strlen(msg);
+    int currentLine = 1, i = currentLine*30;
+    while (i < msgLen - 1) {
+        if (msg[i] == ' ') { msg[i] = '/'; currentLine++; i = currentLine*30; }
+        else i++;
+    }
+    int currentWord = 0, offsetX = 0, offsetY = 0, wordInitPosX = 0, wordInitPosY = 0;
+    bool foundWord = false;
+    for (int i = 0; i < msgLen; i++) {
+        char c = msg[i];
+        if (foundWord && (c == ' ' || c == '.')) {
+            foundWord = false;
+            messageWords[currentWord - 1].rec.width = (int)MeasureTextEx(fontMessage, TextSubtext(msg, wordInitPosX, (i - wordInitPosX)), 30, 0).x;
+            messageWords[currentWord - 1].rec.height = fontMessage.baseSize;
+            strncpy(messageWords[currentWord - 1].text, TextSubtext(msg, wordInitPosX, (i - wordInitPosX)), i - wordInitPosX);
+        }
+        if (c == '@') {
+            foundWord = true;
+            msg[i] = ' ';
+            offsetX = (int)MeasureTextEx(fontMessage, TextSubtext(msg, wordInitPosY, (i + 1) - wordInitPosY), 30, 0).x;
+            messageWords[currentWord].rec.x = offsetX;
+            messageWords[currentWord].rec.y = offsetY;
+            wordInitPosX = i + 1;
+            currentWord++;
+        } else if (c == '/') {
+            msg[i] = '\n';
+            wordInitPosY = i;
+            offsetY += (fontMessage.baseSize + fontMessage.baseSize/2);
+        }
+    }
+    for (int i = 0; i < tmGameplay[cur].wordsCount; i++) {
+        messageWords[i].id = -1;
+        messageWords[i].rec.x += 430;
+        messageWords[i].rec.y += 300;
+        messageWords[i].rec.x -= (texWordsAtlas.width - messageWords[i].rec.width)/2;
+        messageWords[i].rec.y -= ((texWordsAtlas.height / MAX_CODING_WORDS) - messageWords[i].rec.height)/2;
+        messageWords[i].rec.width = texWordsAtlas.width;
+        messageWords[i].rec.height = texWordsAtlas.height / MAX_CODING_WORDS;
+        messageWords[i].hover = false;
+        messageWords[i].picked = false;
+    }
+    AVal t = a_tab();
+    rl_set(t, "atlas", rl_box(&texWordsAtlas, sizeof(texWordsAtlas), rl_tex_fin, RL_KIND_TEX));
+    rl_set(t, "msg", a_strz(msg));
+    rl_set(t, "count", a_int(tmGameplay[cur].wordsCount));
+    return t;
+}
+
+// InitEndingScreen: the headline, with the words placed, on the newspaper.
+static char tmHeadline[256] = "\0";
+static AVal tm_ending (int cur) {
+    free(tmEnding);
+    tmEnding = LoadMissions("resources/missions.txt");
+    int wordsCount = tmEnding[cur].wordsCount;
+    strcpy(tmHeadline, tmEnding[cur].msg);
+    int len = strlen(tmHeadline);
+    for (int i = 0; i < len; i++) if (tmHeadline[i] == '@') tmHeadline[i] = ' ';
+    for (int i = 0; i < wordsCount; i++) {
+        if (messageWords[i].id != tmEnding[cur].sols[i]) {
+            char *title = TextReplace(tmHeadline, messageWords[i].text, codingWords[messageWords[i].id]);
+            // raylib 6.2 returns a static buffer here, which the original
+            // frees and aborts (doc/fidelity.md); the port does not free it
+            if (title != NULL) { strcpy(tmHeadline, title); }
+        }
+    }
+    TraceLog(LOG_WARNING, "Titular: %s", tmHeadline);
+    Image imNewspaper = LoadImage("resources/textures/ending_newspaper.png");
+    Font fontNews = LoadFontEx("resources/fonts/Lora-Bold.ttf", 32, 0, 250);
+    ImageDrawTextEx(&imNewspaper, fontNews, tmHeadline, (Vector2){ 50, 220 }, fontNews.baseSize, 0, DARKGRAY);
+    Texture2D texNewspaper = LoadTextureFromImage(imNewspaper);
+    UnloadImage(imNewspaper);
+    AVal t = a_tab();
+    rl_set(t, "headline", a_strz(tmHeadline));
+    rl_set(t, "paper", rl_box(&texNewspaper, sizeof(texNewspaper), rl_tex_fin, RL_KIND_TEX));
+    rl_set(t, "font", rl_box(&fontNews, sizeof(fontNews), rl_fnt_fin, RL_KIND_FNT));
+    return t;
+}
+```
+
+val W, H = 1280, 720
+val f32  = rl.f32
+
+rl.window [title="transmission mission [GGJ18]", width=W, height=H, fps=60]
+rl.audio_init()
+pin music  = rl.music("resources/audio/music_title.ogg")
+pin fxbutton = rl.sound("resources/audio/fx_newspaper.ogg")
+rl.music_volume(music, 1)
+rl.play_music(music)
+pin font_mission = rl.font_ex("resources/fonts/traveling_typewriter.ttf", 64, 250)
+pin tbutton = rl.texture("resources/textures/title_ribbon.png")
+
+;; the button of every screen, at the bottom right
+val BW, BH = rl.texture_width(tbutton), rl.texture_height(tbutton)
+val BX, BY = W - BW, (H - BH) - 50
+var button_fade = f32(0.8)
+var mission = 0                         ;; currentMission
+val MISSIONS = 4
+
+;; IsButtonPressed: the mouse over it lights it; a click (or a tap) presses it
+func button_pressed (fx) {
+    if rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), BX, BY, BW, BH) {
+        set button_fade = 1
+        if rl.mouse_pressed(0) || rl.gesture_detected(rl.GESTURE_TAP) {
+            rl.play_sound(fxbutton)
+            return true
+        }
+    } else {
+        set button_fade = f32(0.8)
+    }
+    false
+}
+func draw_button (text) {
+    rl.draw_texture_pro(tbutton, 0, 0, BW, BH, BX, BY, BW, BH, 0, 0, 0, rl.fade(rl.WHITE, button_fade))
+    val mx, my = rl.measure_ex(font_mission, text, 30, 0)
+    val cx, cy = f32(BX + f32(BW/2)), f32(BY + f32(BH/2))
+    rl.text_ex(font_mission, text, f32(f32(cx - f32(mx/2)) + 10), f32(f32(cy - f32(my/2)) - 10), 30, 0, rl.WHITE)
+}
+
+;; The logo of raylib, then the logo of the team: 200 frames in, 100 out.
+task LogoScreen () {
+    pin cw = rl.texture("resources/textures/cw_logo.png")
+    do {
+        pin l = spawn Logo(:title, nil)
+        await :rl.frame until l.pub
+    }
+    var alpha = 0
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(cw, (W//2) - (rl.texture_width(cw)//2), (H//2) - (rl.texture_height(cw)//2), rl.fade(rl.WHITE, alpha))
+        }
+    }
+    loop _ in 201 {
+        await :rl.frame
+        set alpha = math.min(f32(alpha + f32(0.02)), 1)
+    }
+    loop _ in 101 {
+        await :rl.frame
+        set alpha = f32(alpha - f32(0.02))
+    }
+    set pub = :title
+    await false
+}
+
+;; The title types "transmission", then "mission", a letter every 15 frames;
+;; the button or ENTER shows it whole and goes on.
+task Title () {
+    pin back   = rl.texture("resources/textures/title_background.png")
+    pin typing = rl.sound("resources/audio/fx_typing.ogg")
+    pin tfont  = rl.font_ex("resources/fonts/mom_typewritter.ttf", 96)
+    set mission = 0
+    var tl, ml = 0, 0
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(back, 0, 0, rl.WHITE)
+            rl.text_ex(tfont, rl.text_subtext("transmissionmission", 0, tl), 519, 221, 44, 0, rl.BLACK)
+            rl.text_ex(tfont, rl.text_subtext("transmissionmission", 12, ml), 580, 261, 44, 0, rl.BLACK)
+            draw_button("start")
+        }
+    }
+    par :any {
+        loop _ in 12 {
+            await rl.Frames(15)
+            set tl += 1
+            rl.play_sound(typing)
+        }
+        loop _ in 7 {
+            await rl.Frames(15)
+            set ml += 1
+            rl.play_sound(typing)
+        }
+        await false
+    } with {
+        await :rl.frame until button_pressed(fxbutton) || rl.key_pressed('ENTER')
+    }
+    set tl, ml = 12, 7
+    rl.stop_music(music)
+    set pub = :mission
+    await false
+}
+
+;; As in the C, `showButton` is never reset: it is false from the second
+;; mission on, until the number shows again.
+var show_button = false
+
+;; The mission: a wait, the line fades in and the number shows (and the
+;; button), a wait, the brief is typed, a wait, the keyword shows and
+;; blinks. The button (or ENTER) first skips to the end, then goes on.
+task Mission () {
+    pin back     = rl.texture("resources/textures/mission_background.png")
+    pin backline = rl.texture("resources/textures/mission_backline.png")
+    pin transmit = rl.sound("resources/audio/fx_message.ogg")
+    pin mmusic   = rl.music("resources/audio/music_mission.ogg")
+    set button_fade = f32(0.8)
+    rl.play_music(mmusic)
+    val m = `:value tm_mission(RL_I($mission), $font_mission)`
+    val ky = f32(f32(245 + m.h) + 60)
+    var fade, length, number, keyword, blink = 0, 0, false, false, true
+    var done = false                    ;; writeEnd
+    var c = 0                           ;; the frames of the current wait (the C keeps them after a skip)
+    rl.play_sound(transmit)
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(back, 0, 0, rl.WHITE)
+            rl.draw_texture_pro(backline, 0, 0, W, rl.texture_height(backline), 0, 0, W, rl.texture_height(backline), 0, 0, 0, rl.fade(rl.WHITE, fade))
+            if number {
+                rl.text_ex(font_mission, string.format("Filtración #%02d ", mission + 1), 150, 185, 40, 0, rl.RAYWHITE)
+            }
+            rl.text_ex(font_mission, rl.text_subtext(m.brief, 0, length), 150, 245, 30, 0, rl.LIGHTGRAY)
+            if keyword && blink {
+                rl.text_ex(font_mission, "Keyword: " ++ m.key, 150, ky, 40, 0, rl.color(198, 49, 60, 255))
+            }
+            if show_button {
+                draw_button(if done => "codificar" => "saltar")
+            }
+        }
+    }
+    ;; a wait of n frames, counted in `c`
+    val wait = task (n) {
+        set c = 0
+        loop {
+            await :rl.frame
+            set c += 1
+            until (c % n) == 0
+        }
+        set c = 0
+    }
+    val skipped = par :any {
+        await wait(60)
+        set c = 0
+        loop {
+            await :rl.frame
+            set c += 1
+            set fade = f32(fade + f32(0.02))
+            until (c % 30) == 0
+        }
+        set c, number, show_button = 0, true, true
+        await wait(60)
+        loop {
+            await :rl.frame
+            set length += 1
+            set c = 0
+            until length == m.max
+        }
+        await wait(60)
+        false
+    } with {
+        ;; ENTER or the button, once the button shows, skips the rest
+        await :rl.frame until show_button && (rl.key_pressed('ENTER') || button_pressed(fxbutton))
+        set length = m.max
+        true
+    }
+    set done, keyword, number = true, true, true
+    ;; the keyword blinks every 15 frames, from where the counter was
+    spawn {
+        loop {
+            await :rl.frame
+            set c += 1
+            if (c % 15) == 0 {
+                set c = 0
+                set blink = !blink
+            }
+        }
+    }
+    ;; (the C checks the button again in the frame the writing ends)
+    if skipped || !(show_button && (rl.key_pressed('ENTER') || button_pressed(fxbutton))) {
+        await :rl.frame until show_button && (rl.key_pressed('ENTER') || button_pressed(fxbutton))
+    }
+    set show_button = false
+    rl.stop_music(music)
+    set pub = :gameplay
+    await false
+}
+
+var words = []                          ;; the twelve words to place, for the ending too
+
+task Gameplay () {
+    pin back     = rl.texture("resources/textures/message_background.png")
+    pin vignette = rl.texture("resources/textures/message_vignette.png")
+    pin fxgrab  = rl.sound("resources/audio/fx_grab.ogg")
+    pin fxplace = rl.sound("resources/audio/fx_place.ogg")
+    pin fxleave = rl.sound("resources/audio/fx_leave.ogg")
+    pin spy = rl.music("resources/audio/s_p_y.xm")
+    pin fmsg = rl.font_ex("resources/fonts/traveling_typewriter.ttf", 30, 250)
+    rl.play_music(spy)
+    val g = `:value tm_gameplay(RL_I($mission), $fmsg)`
+    val atlas = g.atlas
+    val n = g.count
+    set words = []
+    loop i in 12 {
+        val r = [x=110 + (940*(i//6)), y=200 + (60*(i%6)), w=140, h=35]
+        vector.insert(words, [rec=r, ini=r ++ [], hover=false, picked=false])
+    }
+    val mw = func (j) {
+        return `:number messageWords[RL_I($j)].rec.x`, `:number messageWords[RL_I($j)].rec.y`,
+               `:number messageWords[RL_I($j)].rec.width`, `:number messageWords[RL_I($j)].rec.height`
+    }
+    val mw_id = func (j) { `:number messageWords[RL_I($j)].id` }
+    val mw_set_id = func (j, v) { `messageWords[RL_I($j)].id = RL_I($v);` }
+    val mw_hover = func (j) { `:boolean messageWords[RL_I($j)].hover` }
+    val mw_set_hover = func (j, v) { `messageWords[RL_I($j)].hover = a_truthy($v);` }
+    val over = func (j) {
+        val x, y, w, h = mw(j)
+        rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), x, y, w, h)
+    }
+    var can_send = false
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(back, 0, 0, rl.WHITE)
+            rl.text_ex(fmsg, g.msg, 430, 300, rl.font_size(fmsg), 0, rl.BLACK)
+            loop i in n {
+                val x, y, w, h = mw(i)
+                rl.rectangle_lines(x, y, w, h, rl.fade(rl.RED, 0.35))
+                if mw_hover(i) {
+                    rl.rectangle_v(x, y, w, h, rl.fade(rl.RED, 0.30))
+                }
+                rl.text(string.format("%d", mw_id(i)), i*25, 0, 30, rl.RED)
+            }
+            loop i,wd in words {
+                rl.draw_texture_rec(atlas, 0, i*35, 140, 35, wd.rec.x, wd.rec.y,
+                    if wd.picked => rl.MAROON => (if wd.hover => rl.RED => rl.WHITE))
+            }
+            rl.draw_texture_pro(vignette, 0, 0, rl.texture_width(vignette), rl.texture_height(vignette), 0, 0, W, H, 0, 0, 0, rl.WHITE)
+            if can_send {
+                draw_button("enviar")
+            }
+        }
+    }
+    loop on :rl.frame {
+        loop i,wd in words {
+            if rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), wd.rec.x, wd.rec.y, wd.rec.w, wd.rec.h) {
+                set wd.hover = true
+                if rl.mouse_pressed(0) {
+                    set wd.picked = true
+                    rl.play_sound(fxgrab)
+                }
+            } else {
+                set wd.hover = false
+            }
+            if wd.picked {
+                loop j in n {
+                    mw_set_hover(j, over(j))
+                }
+                if rl.mouse_released(0) {
+                    set wd.picked = false
+                    loop j in n {
+                        mw_set_hover(j, false)
+                        if over(j) {
+                            rl.play_sound(fxplace)
+                            val x, y = mw(j)
+                            set wd.rec.x, wd.rec.y = x, y
+                            if mw_id(j) != -1 {
+                                val o = words@(mw_id(j))
+                                set o.rec = o.ini ++ []
+                            }
+                            mw_set_id(j, i)
+                            loop k in n {
+                                if (j != k) && (mw_id(j) == mw_id(k)) {
+                                    mw_set_id(k, -1)
+                                    break
+                                }
+                            }
+                            break
+                        } else {
+                            rl.play_sound(fxleave)
+                            set wd.rec = wd.ini ++ []
+                            if i == mw_id(j) {
+                                mw_set_id(j, -1)
+                            }
+                        }
+                    }
+                }
+            }
+            if wd.picked {
+                set wd.rec.x = f32(rl.mouse_x() - f32(wd.rec.w/2))
+                set wd.rec.y = f32(rl.mouse_y() - f32(wd.rec.h/2))
+            }
+        }
+        set can_send = true
+        loop j in n {
+            if mw_id(j) == -1 {
+                set can_send = false
+                break
+            }
+        }
+        if can_send && (rl.key_pressed('ENTER') || button_pressed(fxbutton)) {
+            set pub = :ending
+        }
+    }
+}
+
+task Ending () {
+    pin back     = rl.texture("resources/textures/ending_background.png")
+    pin vignette = rl.texture("resources/textures/message_vignette.png")
+    pin fxnews   = rl.sound("resources/audio/fx_batman.ogg")
+    val e = `:value tm_ending(RL_I($mission))`
+    val paper = e.paper
+    val fnews = e.font
+    var rotation, scale = f32(0.1), f32(0.05)
+    var ready = false
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(back, 0, 0, rl.WHITE)
+            val pw, ph = rl.texture_width(paper), rl.texture_height(paper)
+            rl.draw_texture_pro(paper, 0, 0, pw, ph, W//2, H//2, f32(pw*scale), f32(ph*scale),
+                f32(f32(pw*scale)/2), f32(f32(ph*scale)/2), rotation, rl.WHITE)
+            rl.draw_texture_ex(vignette, 0, 0, 0, 2, rl.WHITE)
+            rl.text_ex(fnews, e.headline, 10, 10, rl.font_size(fnews), 0, rl.RAYWHITE)
+            ;; (as in the C, with the mission of now, which ENTER already moved on)
+            val n = `:number tmEnding[RL_I($mission)].wordsCount`
+            loop i in n {
+                val id = `:number messageWords[RL_I($i)].id`
+                val sol = `:number tmEnding[RL_I($mission)].sols[RL_I($i)]`
+                rl.text(`:string codingWords[RL_I($id)]`, 10, 60 + (30*i), 20, if id == sol => rl.GREEN => rl.RED)
+            }
+            if ready {
+                draw_button("continuar")
+            }
+        }
+    }
+    spawn {
+        await rl.Frames(10)
+        rl.play_sound(fxnews)
+    }
+    ;; it spins and grows; once whole, the button, from that same frame
+    loop on :rl.frame {
+        if !ready {
+            set rotation = f32(rotation + 18)
+            set scale = f32(scale + f32(0.0096))
+            if scale >= 1 {
+                set scale, ready = 1, true
+            }
+        }
+        until ready && (rl.key_pressed('ENTER') || button_pressed(fxbutton))
+    }
+    set mission += 1
+    if mission >= MISSIONS {
+        set mission = 0
+        rl.play_music(music)
+        set pub = :title
+    } else {
+        set pub = :mission
+    }
+    await false
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            val ids = []
+            loop j in 8 {
+                vector.insert(ids, `:number messageWords[RL_I($j)].id`)
+            }
+            print(string.format("%d %d %s", rl.frame(), mission, vector.join(ids, " ")))
+        }
+    }
+}
+;; [/trace]
+
+val FADE = [
+    color = rl.BLACK,
+    inc = f32(0.02), into = \{ it > f32(1.01) },
+    dec = f32(0.02), back = \{ it < f32(-0.01) },
+]
+await Screens([logo=LogoScreen, title=Title, mission=Mission, gameplay=Gameplay, ending=Ending], :logo, FADE)

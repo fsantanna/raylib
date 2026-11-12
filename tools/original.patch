@@ -503,6 +503,34 @@ index a130302..4d5ffe7 100644
 +}
 +// Atmos port: trace
 +int RepairMatch(void) { return matchValue; }
+diff --git a/transmission/src/transmission.c b/transmission/src/transmission.c
+index c4962ef..6c76070 100644
+--- a/transmission/src/transmission.c
++++ b/transmission/src/transmission.c
+@@ -13,6 +13,8 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #include <stdlib.h>
+@@ -319,6 +321,14 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        printf("%d %d", RltFrame(), currentMission);
++        for (int j = 0; j < MAX_MISSION_WORDS; j++) printf(" %d", messageWords[j].id);
++        printf("\n");
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
 diff --git a/wave_collector/src/screen_gameplay.c b/wave_collector/src/screen_gameplay.c
 index 5ec7b84..10cbc7e 100644
 --- a/wave_collector/src/screen_gameplay.c
