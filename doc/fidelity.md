@@ -405,3 +405,26 @@ warp.
   C.
 - A run of the whole wave takes about 3 minutes for each side: the software
   renderer draws 1280 by 720 with some 600 shapes per frame.
+
+## repair
+
+Same as the original on its runs `play` (1850 frames, 30 screens: the
+logo, START DATE, the five buttons of re-touch, SPACE, GO DATE, the ending
+and its likes, AGAIN, the title again, ENTER through the screens) and
+`keys` (1500 frames, 15 screens, seed 2: the keyboard only).
+
+Trace: frame, the player and the date (their parts), the match; printed
+after the logic and before the drawing, since the buttons act while they
+are drawn.
+
+- **Buttons** act in the drawing (`GuiButton` is called by the `Draw...`
+  functions of the C), so a click changes things and draws random numbers in
+  :rl.draw, and the screen notices it in the next frame. They also act
+  while a screen is under the fade, which only stops its update.
+- `IsGestureDetected(GESTURE_TAP)` is false in the test mode: the memory
+  platform feeds no gestures. The port calls it as the C does.
+- The button HAIR draws `GetRandomValue(0, texHair.width/BASE_HAIR_WIDTH)`
+  with no `- 1`, so it may pick a hair past the last one, which draws
+  nothing; the port keeps it.
+- The counter of the title is never reset: on a second visit its button
+  shows at once.

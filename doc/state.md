@@ -305,3 +305,20 @@ awaits and loops there.
 | `player`, `warpCounter`, `samplesSpeed`, `synchro`, `combo`, `maxCombo`, `collectedSamples`, `currentSample`, `totalSamples` | drawn, and data | the fields of `g` |
 | `titleAlpha` | drawn; never reset, so a second visit to the title shows it at once | `title_alpha`, outside the screen |
 | textures, sounds, the render texture, the font, the music | resources | pinned in their screen, or for the whole program |
+
+## repair
+
+The screens and the logo as in `wave_collector` (`games/screens.atm`), with
+the black fade of this game (`FADE_BLACK`). The buttons are immediate, as
+in the C: they act while they are drawn.
+
+| C | Kind | Port |
+|---|------|------|
+| `doHairCut`, `doHairTint`, `doEyeLiner`, `doLipStick`, `doNose`, `doGlasses` | control: a button used once | the task `Once`: a loop until the button is pressed, its effect, then the button inert (`doGlasses` was never read) |
+| `framesCounter` (title) | control: a part of the player every 6 frames | `await rl.Frames(6)` in a loop |
+| `titleCounter` | control: the button after 180 frames; never reset, so a second visit shows it at once | **left**: `title_frames`, outside the screen |
+| `titlePositionY` | drawn | `y` |
+| `framesCounter`, `state` (ending) | control: the question mark blinks for 200 frames, then the likes | an await of 201 frames with a blink of 15 and 15, then the likes in sequence |
+| `finishScreen` | control | the screen's `pub` |
+| `player`, `playerBase`, `dating`, `datingBase`, `playerLikes`, `playerBaseLikes`, `matchValue` | data, and drawn | `player`, `player_base`, `dating`, `dating_base`, `likes`, `base`, `m` |
+| `npInfo.source.x` | data: set from the state of each button just before it is drawn | an argument of the drawing |

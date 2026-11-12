@@ -1,0 +1,297 @@
+;; Re-Pair (GGJ2020), by Ramon Santamaria (@raysan5).
+;; Copyright (c) 2020 Ramon Santamaria (@raysan5), zlib license. The art and
+;; sound are those of the original, credited in README.original.md.
+;;
+;; Ported to Atmos: an altered version of `repair/src/*.c` of
+;; raysan5/raylib-games. The game is the same; the screens, the transition,
+;; the logo, the blinking question mark, and the buttons that can be used
+;; once are tasks and awaits. The buttons are immediate, as in the C: they
+;; act while they are drawn, in :rl.draw.
+
+include "../../raylib.atm"
+include "../screens.atm"
+
+val W, H = 1280, 720
+val f32  = rl.f32
+
+rl.window [title="RE-PAIR [GGJ2020]", width=W, height=H, fps=60]
+rl.audio_init()
+pin font = rl.font("resources/font.png")
+rl.texture_filter(font, rl.FILTER_BILINEAR)
+val FS = rl.font_size(font)
+pin music      = rl.music("resources/elevator_romance.ogg")
+pin coin       = rl.sound("resources/coin.wav")
+pin background = rl.texture("resources/background.png")
+pin npatch     = rl.texture("resources/npatch.png")
+pin thead      = rl.texture("resources/head_models.png")
+pin thair      = rl.texture("resources/hair_models.png")
+pin tnose      = rl.texture("resources/nose_models.png")
+pin tmouth     = rl.texture("resources/mouth_models.png")
+pin teyes      = rl.texture("resources/eyes_models.png")
+rl.music_volume(music, 0.5)
+
+val HEAD, HAIR, NOSE, MOUTH, EYES = 400, 500, 80, 170, 240      ;; widths of the parts
+val HEADS = [0xffe29bff, 0xfed5a8ff, 0xad8962ff, 0xfff1b8ff, 0xffd6c4ff, 0xd49c8dff]
+val HAIRS = [0xf5bf60ff, 0xaa754aff, 0x974e14ff, 0xf36347ff, 0x87f347ff, 0xfc48d0ff, 0x3b435dff, 0x5f5e60ff, 0xe7e7e7ff, 0xfb386bff]
+val BACK  = 0xf6aa60ff
+
+var player, player_base, dating, dating_base = [], [], [], []
+
+func generate () {
+    val c = []
+    set c.head    = rl.random(0, (rl.texture_width(thead)//HEAD) - 1)
+    set c.colHead = HEADS@(rl.random(0, 5))
+    set c.hair    = rl.random(0, (rl.texture_width(thair)//HAIR) - 1)
+    set c.colHair = HAIRS@(rl.random(0, 9))
+    set c.eyes    = rl.random(0, (rl.texture_width(teyes)//EYES) - 1)
+    set c.nose    = rl.random(0, (rl.texture_width(tnose)//NOSE) - 1)
+    set c.mouth   = rl.random(0, (rl.texture_width(tmouth)//MOUTH) - 1)
+    c
+}
+
+func customize (c) {
+    if rl.random(0, 1) == 1 { set c.hair = rl.random(0, (rl.texture_width(thair)//HAIR) - 1) }
+    if rl.random(0, 1) == 1 { set c.colHair = HAIRS@(rl.random(0, 9)) }
+    if rl.random(0, 1) == 1 { set c.eyes = rl.random(0, (rl.texture_width(teyes)//EYES) - 1) }
+    if rl.random(0, 1) == 1 { set c.nose = rl.random(0, (rl.texture_width(tnose)//NOSE) - 1) }
+    if rl.random(0, 1) == 1 { set c.mouth = rl.random(0, (rl.texture_width(tmouth)//MOUTH) - 1) }
+}
+
+func draw_character (c, x, y) {
+    rl.draw_texture_rec(thair, HAIR*c.hair, 240, HAIR, rl.texture_height(thair) - 240, x + ((250 - HAIR)//2), y + 240, c.colHair)
+    rl.draw_texture_rec(thead, HEAD*c.head, 0, HEAD, rl.texture_height(thead), x + ((250 - HEAD)//2), y + 60, c.colHead)
+    rl.draw_texture_rec(thair, HAIR*c.hair, 0, HAIR, 240, x + ((250 - HAIR)//2), y, c.colHair)
+    rl.draw_texture_rec(teyes, EYES*c.eyes, 0, EYES, rl.texture_height(teyes), x + ((250 - EYES)//2), y + 190, rl.WHITE)
+    rl.draw_texture_rec(tnose, NOSE*c.nose, 0, NOSE, rl.texture_height(tnose), x + ((250 - NOSE)//2), y + 275, c.colHead)
+    rl.draw_texture_rec(tmouth, MOUTH*c.mouth, 0, MOUTH, rl.texture_height(tmouth), x + ((250 - MOUTH)//2), y + 370, c.colHead)
+}
+
+;; A button of the C (GuiButton): drawn, and pressed when the left button is
+;; released over it; `forced` >= 0 fixes its look and makes it inert.
+val TEXT_COLORS = [0xeff6ffff, 0x78e782ff, 0xb04d5fff, 0xd6d6d6ff]
+func button (x, y, w, h, text, forced) {
+    var state = if forced >= 0 => forced => 0
+    var pressed = false
+    val tw, th = rl.measure_ex(font, text, FS, 1)
+    if (state < 3) && (forced < 0) {
+        if rl.check_collision_point_rec(rl.mouse_x(), rl.mouse_y(), x, y, w, h) {
+            set state = if rl.mouse_down(0) => 2 => 1
+            if rl.mouse_released(0) || rl.gesture_detected(rl.GESTURE_TAP) {
+                set pressed = true
+                rl.play_sound(coin)
+            }
+        }
+    }
+    rl.draw_texture_npatch(npatch, 80*state, 0, 80, rl.texture_height(npatch), 24, 24, 24, 24, x, y, w, h, rl.WHITE)
+    rl.text_ex(font, text, f32(f32(x + f32(w/2)) - f32(tw/2)), f32(f32(f32(y + f32(h/2)) - f32(th/2)) + 4), FS, 1, TEXT_COLORS@state)
+    pressed
+}
+
+task LogoScreen () {
+    pin l = spawn Logo(:title, nil)
+    await :rl.frame until l.pub
+    rl.play_music(music)
+    set pub = l.pub
+    await false
+}
+
+;; As in the C, the frames of the title are never reset: on a second visit,
+;; its button is there at once.
+var title_frames = 0
+
+task Title () {
+    pin ttitle = rl.texture("resources/title.png")
+    pin tlogo  = rl.texture("resources/raylib_logo.png")
+    set player = generate()
+    var y = -200
+    spawn {
+        ;; every 6 frames, one part of the player changes
+        loop {
+            await rl.Frames(6)
+            match rl.random(0, 4) {
+                0 => {
+                    set player.head = rl.random(0, (rl.texture_width(thead)//HEAD) - 1)
+                    set player.colHead = HEADS@(rl.random(0, 5))
+                }
+                1 => { set player.eyes = rl.random(0, (rl.texture_width(teyes)//EYES) - 1) }
+                2 => { set player.nose = rl.random(0, (rl.texture_width(tnose)//NOSE) - 1) }
+                3 => { set player.mouth = rl.random(0, (rl.texture_width(tmouth)//MOUTH) - 1) }
+                4 => {
+                    set player.hair = rl.random(0, (rl.texture_width(thair)//HAIR) - 1)
+                    set player.colHair = HAIRS@(rl.random(0, 9))
+                }
+            }
+        }
+    }
+    spawn {
+        loop on :rl.frame {
+            set y = math.min(y + 3, 40)
+            set title_frames += 1
+            if rl.key_pressed('ENTER') {
+                set pub = :gameplay
+            }
+        }
+    }
+    loop on :rl.draw {
+        rl.draw_texture(background, 0, 0, BACK)
+        draw_character(player, (W//2) - 125, 80)
+        rl.draw_texture(ttitle, (W//2) - (rl.texture_width(ttitle)//2), y, rl.WHITE)
+        if title_frames > 180 {
+            if button((W//2) - (440//2), 580, 440, 80, "START DATE!", -1) {
+                set pub = :gameplay
+            }
+        }
+        rl.text("powered by", 20, (H - rl.texture_height(tlogo)) - 35, 10, rl.BLACK)
+        rl.draw_texture(tlogo, 20, (H - rl.texture_height(tlogo)) - 20, rl.WHITE)
+    }
+}
+
+;; A button that can be used once: it acts, then stays inert.
+task Once (y, text, act) {
+    loop on :rl.draw {
+        until button(20, y, 300, 80, text, -1)
+    }
+    act()
+    loop on :rl.draw {
+        button(20, y, 300, 80, text, 3)
+    }
+}
+
+task Gameplay () {
+    pin target = rl.render_texture(720, 720)
+    rl.texture_filter(target, rl.FILTER_BILINEAR)
+    set player_base = player ++ []
+    set dating = generate()
+    set dating_base = dating ++ []
+    spawn {
+        loop on :rl.frame {
+            if rl.key_pressed('SPACE') {
+                set player = generate()
+                set player_base = player ++ []
+            }
+            if rl.key_pressed('ENTER') {
+                set pub = :ending
+            }
+        }
+    }
+    ;; in the order they are drawn
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(background, 0, 0, BACK)
+            button(20, 40, 300, 60, "RE-TOUCH:", 2)
+        }
+    }
+    spawn Once(40 + 90,  "HAIR TINT", \{ set player.colHair = HAIRS@(rl.random(0, 9)) })
+    spawn Once(40 + 180, "HAIR",      \{ set player.hair = rl.random(0, rl.texture_width(thair)//HAIR) })
+    spawn Once(40 + 270, "EYES",      \{ set player.eyes = rl.random(0, (rl.texture_width(teyes)//EYES) - 1) })
+    spawn Once(40 + 360, "NOSE",      \{ set player.nose = rl.random(0, (rl.texture_width(tnose)//NOSE) - 1) })
+    spawn Once(40 + 450, "LIPS",      \{ set player.mouth = rl.random(0, (rl.texture_width(tmouth)//MOUTH) - 1) })
+    loop on :rl.draw {
+        button(20, 40 + 540, 300, 80, "GLASSES", 3)
+        draw_character(player, (W//2) - 125, 80)
+        button(970, 40, 260, 60, "DATING:", 2)
+        button(970, 40 + 70, 260, 260, " ", 0)
+        rl.begin_texture_mode(target)
+        draw_character(dating, (720 - 250)//2, (720 - 500)//2)
+        rl.end_texture_mode()
+        rl.draw_texture_pro(target, 0, 0, 720, -720, 970, 40 + 70, 260, 260, 0, 0, 0, rl.WHITE)
+        if button(970, 580, 260, 90, "GO DATE!", -1) {
+            set pub = :ending
+        }
+    }
+}
+
+var match_value = 0             ;; (for the trace)
+
+task Ending () {
+    pin tqmark = rl.texture("resources/qmark.png")
+    pin tmatch = rl.texture("resources/match.png")
+    customize(dating)
+    spawn {
+        await :rl.key.dn [name='ENTER']
+        set pub = :title
+        rl.play_sound(coin)
+    }
+    spawn {
+        loop on :rl.draw {
+            rl.draw_texture(background, 0, 0, BACK)
+            draw_character(player, 180, 40)
+            draw_character(dating, 820, 40)
+        }
+    }
+    ;; the question mark blinks, 15 frames off and 15 on, for 200 frames
+    par :any {
+        await rl.Frames(201)
+    } with {
+        await rl.Frames(15)
+        loop {
+            watching rl.Frames(15) {
+                loop on :rl.draw {
+                    rl.draw_texture(tqmark, (W//2) - (rl.texture_width(tqmark)//2), 180, rl.WHITE)
+                }
+            }
+            await rl.Frames(15)
+        }
+    }
+    ;; the likes of the date, before and after the re-touch
+    val like = func (part) {
+        ifs {
+            part@0 == dating@(part@1)      => rl.random(70, 100)
+            part@0 == dating_base@(part@1) => rl.random(0, 30)
+            else                           => rl.random(0, 100)
+        }
+    }
+    val parts = [:hair, :colHair, :eyes, :nose, :mouth]
+    val LABELS = ["HAIR:", "TINT:", "EYES:", "NOSE:", "LIPS:"]
+    val base, likes = [], []
+    loop _,k in parts { set base@k = like([player_base@k, k]) }
+    loop _,k in parts { set likes@k = like([player@k, k]) }
+    set match_value = 0
+    loop _,k in parts { set match_value += likes@k }
+    val m = match_value
+    loop on :rl.draw {
+        rl.text_ex(font, string.format("MATCH: %d%%", math.floor(f32(f32(m/f32(500))*100))), 420, 40, FS*2, 1, rl.SKYBLUE)
+        val mh = rl.texture_height(tmatch)
+        rl.draw_texture_rec(tmatch, 0, if m > 250 => 0 => (mh//2), rl.texture_width(tmatch), mh//2,
+            (W//2) - (rl.texture_width(tmatch)//2), 240, rl.WHITE)
+        loop i,k in parts {
+            val y = 550 + (30*i)
+            rl.text_ex(font, LABELS@i, 80, y, FS//2, 1, rl.WHITE)
+            rl.rectangle(80 + 80, y + 6, 400, FS//4, rl.GRAY)
+            rl.rectangle(80 + 80, y + 6, (base@k)*4, FS//4, rl.RED)
+        }
+        loop i,k in parts {
+            val y = 550 + (30*i)
+            if player@k != player_base@k {
+                rl.text_ex(font, "after re-touch:", ((80 + 80) + 400) + 20, y, FS//2, 1, rl.WHITE)
+                rl.rectangle((((80 + 80) + 400) + 100) + 90, y + 6, 400, FS//4, rl.GRAY)
+                rl.rectangle((((80 + 80) + 400) + 100) + 90, y + 6, (likes@k)*4, FS//4, rl.RED)
+            }
+        }
+        if button(W - 280, 60, 260, 80, "AGAIN!", -1) {
+            set pub = :title
+        }
+    }
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic and before
+;; the drawing (where the buttons act)
+spawn {
+    if rl.frame() > 0 {
+        val f = func (c) {
+            if c.colHead => string.format("%d %d %d %d %d %d %d", c.head, c.colHead, c.hair, c.colHair, c.eyes, c.nose, c.mouth) => "-"
+        }
+        loop on :rl.draw {
+            print(string.format("%d %s %s %d", rl.frame(), f(player), f(dating), match_value))
+        }
+    }
+}
+;; [/trace]
+
+await Screens([logo=LogoScreen, title=Title, gameplay=Gameplay, ending=Ending], :logo, FADE_BLACK)

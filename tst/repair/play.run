@@ -1,0 +1,8 @@
+# The logo; START DATE (after 180 frames of the title); the five buttons of
+# re-touch, SPACE, HAIR TINT again (inert), GO DATE; the ending blinks, then
+# the likes; AGAIN; the title again (its button at once); START DATE; ENTER
+# through the gameplay and the ending.
+FRAMES=1850
+SEED=1
+INPUT=795:mv:640:620,800:md:0,801:mu:0,895:mv:170:170,900:md:0,901:mu:0,915:mv:170:260,920:md:0,921:mu:0,935:mv:170:350,940:md:0,941:mu:0,955:mv:170:440,960:md:0,961:mu:0,975:mv:170:530,980:md:0,981:mu:0,1010:dn:SPACE,1011:up:SPACE,1025:mv:170:170,1030:md:0,1031:mu:0,1045:mv:1100:625,1050:md:0,1051:mu:0,1395:mv:1130:100,1400:md:0,1401:mu:0,1495:mv:640:620,1500:md:0,1501:mu:0,1600:dn:ENTER,1601:up:ENTER,1700:dn:ENTER,1701:up:ENTER
+SHOTS="1 300 600 700 790 801 830 880 905 925 945 965 985 1012 1031 1051 1100 1150 1250 1300 1350 1401 1450 1501 1550 1601 1650 1701 1750 1850"

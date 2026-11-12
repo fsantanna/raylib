@@ -31,4 +31,4 @@ the runs: no number here is typed by hand.
 | tetris | 577 | 341 | 4370 | 2894 | 11 | 2 | 2 (10000 frames, 26 screens) | yes |
 | raylife | 196 | 181 | 1506 | 1413 | 1 | 1 | 2 (1400 frames, 33 screens) | yes |
 | wave_collector | 679 | 408 | 4998 | 3651 | 7 | 1 | 3 (13723 frames, 46 screens) | yes |
-| repair | 672 | 372 | 5601 | 3774 | None | None | 1 (1600 frames, 18 screens) | no |
+| repair | 672 | 372 | 5601 | 3774 | 5 | 1 | 2 (3350 frames, 45 screens) | yes |

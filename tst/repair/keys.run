@@ -1,0 +1,6 @@
+# Seed 2, the keyboard only: ENTER on the title, SPACE twice in the
+# gameplay, ENTER, the ending until the likes, ENTER, the title again.
+FRAMES=1500
+SEED=2
+INPUT=700:dn:ENTER,701:up:ENTER,820:dn:SPACE,821:up:SPACE,850:dn:SPACE,851:up:SPACE,900:dn:ENTER,901:up:ENTER,1250:dn:ENTER,1251:up:ENTER
+SHOTS="1 600 701 760 822 852 901 950 1000 1100 1200 1251 1300 1400 1500"
