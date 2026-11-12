@@ -359,6 +359,13 @@ val rl = [
         `:number ((RltFrame != NULL) ? RltFrame() : -1)`
     },
 
+    ;; await rl.Frames(n): n frames of logic (n times :rl.frame)
+    Frames = task (n) {
+        loop _ in n {
+            await :rl.frame
+        }
+    },
+
     ;; Time
     time       = func () { `:number GetTime()` },
     frame_time = func () { `:number GetFrameTime()` },

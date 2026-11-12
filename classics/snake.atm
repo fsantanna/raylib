@@ -1,0 +1,165 @@
+;; raylib - classic game: snake
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/snake.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: the counter of frames, `gameOver`, `pause`, `allowMove`, and
+;; `fruit.active` of the C became awaits and tasks.
+
+include "../raylib.atm"
+
+val W, H   = 800, 450
+val SQUARE = 31
+val OX, OY = W % SQUARE, H % SQUARE     ;; the grid is centered: offset/2 at each side
+
+rl.window [title="classic game: snake", width=W, height=H, fps=60]
+
+;; What is drawn, and what the trace shows. As in the C, the fruit outlives a
+;; game: in the frame of a restart, the last fruit is still drawn.
+var snake = []                  ;; the segments, from the head: [x=,y=]
+var fruit = [x=0, y=0]          ;; where the fruit is drawn
+var phase = :play               ;; :play, :pause, or :over (for the trace)
+
+;; A random cell of the grid, as in the C: x, then y.
+func cell () {
+    val x = (rl.random(0, (W//SQUARE) - 1) * SQUARE) + (OX/2)
+    val y = (rl.random(0, (H//SQUARE) - 1) * SQUARE) + (OY/2)
+    [x=x, y=y]
+}
+
+func same (a, b) {
+    (a.x == b.x) && (a.y == b.y)
+}
+
+;; A fruit out of the snake: draws again while it falls on a segment.
+func place () {
+    loop {
+        val p = cell()
+        val hit = loop _,s in snake {
+            until same(p, s)
+        }
+        if !hit {
+            break p
+        }
+    }
+}
+
+;; The logic of one game, one step every 5 frames of play. Returns at the
+;; end of the game: the snake hit a wall or itself.
+task Logic () {
+    var speed = [x=SQUARE, y=0]
+    par :any {
+        ;; the snake: the head moves, and each segment takes the place of the
+        ;; one before it
+        await :rl.frame
+        loop {
+            val head = snake@0
+            vector.insert(snake, 0, [x=head.x+speed.x, y=head.y+speed.y])
+            val tail = vector.remove(snake)
+            val h = snake@0
+            val wall = (h.x > (W-OX)) || (h.y > (H-OY)) || (h.x < 0) || (h.y < 0)
+            val self = loop i in (1, #snake - 1) {
+                until same(h, snake@i)
+            }
+            until wall || self
+            emit :moved [tail=tail]
+            await rl.Frames(5)
+        }
+    } with {
+        ;; the fruit: placed in the first frame, after the move, and in the
+        ;; frame after it is eaten (the eaten one is drawn until then); when
+        ;; eaten, the last segment comes back
+        loop {
+            await :rl.frame
+            set fruit = place()
+            val e = await :moved until same(snake@0, fruit)
+            vector.insert(snake, e.tail)
+        }
+    } with {
+        ;; the turns: at most one per step, never back
+        loop {
+            await :moved
+            val e = await :rl.key.dn until (match it.name {
+                'RIGHT' => speed.x == 0
+                'LEFT'  => speed.x == 0
+                'UP'    => speed.y == 0
+                'DOWN'  => speed.y == 0
+                else    => false
+            })
+            set speed = match e.name {
+                'RIGHT' => [x= SQUARE, y=0]
+                'LEFT'  => [x=-SQUARE, y=0]
+                'UP'    => [x=0, y=-SQUARE]
+                'DOWN'  => [x=0, y= SQUARE]
+            }
+        }
+    }
+}
+
+;; One game: the logic, its drawing, and the pause.
+task Game () {
+    set snake = [ [x=OX/2, y=OY/2] ]
+    set phase = :play
+    pin logic = spawn Logic()
+    spawn {
+        loop on :rl.draw {
+            loop i in (0, W//SQUARE) {
+                rl.line_v((SQUARE*i)+(OX/2), OY/2, (SQUARE*i)+(OX/2), H-(OY/2), rl.LIGHTGRAY)
+            }
+            loop i in (0, H//SQUARE) {
+                rl.line_v(OX/2, (SQUARE*i)+(OY/2), W-(OX/2), (SQUARE*i)+(OY/2), rl.LIGHTGRAY)
+            }
+            loop i,s in snake {
+                rl.rectangle_v(s.x, s.y, SQUARE, SQUARE, if i==0 => rl.DARKBLUE => rl.BLUE)
+            }
+            rl.rectangle_v(fruit.x, fruit.y, SQUARE, SQUARE, rl.SKYBLUE)
+        }
+    }
+    spawn {
+        loop {
+            await :rl.key.dn [name='P']
+            toggle logic(false)
+            set phase = :pause
+            watching :rl.key.dn [name='P'] {
+                val s = "GAME PAUSED"
+                loop on :rl.draw {
+                    rl.text(s, (W//2) - (rl.measure(s,40)//2), (H//2) - 40, 40, rl.GRAY)
+                }
+            }
+            toggle logic(true)
+            set phase = :play
+        }
+    }
+    await(logic)
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; the trace of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            val h = snake@0
+            print(string.format("%d %s %d %.1f %.1f %.1f %.1f",
+                rl.frame(), phase, #snake, h.x, h.y, fruit.x, fruit.y))
+        }
+    }
+}
+
+loop {
+    await Game()
+    set phase = :over
+    watching :rl.key.dn [name='ENTER'] {
+        val s = "PRESS [ENTER] TO PLAY AGAIN"
+        loop on :rl.draw {
+            rl.text(s, (rl.width()//2) - (rl.measure(s,20)//2), (rl.height()//2) - 50, 20, rl.GRAY)
+        }
+    }
+    await :rl.frame         ;; the frame of ENTER only starts the next game
+}

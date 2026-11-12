@@ -1,0 +1,5 @@
+# Six fruits with no pause, then three turns into its own body.
+FRAMES=460
+SEED=1
+INPUT=61:dn:DOWN,62:up:DOWN,71:dn:LEFT,72:up:LEFT,81:dn:DOWN,82:up:DOWN,106:dn:LEFT,107:up:LEFT,146:dn:DOWN,147:up:DOWN,161:dn:RIGHT,162:up:RIGHT,271:dn:UP,272:up:UP,296:dn:LEFT,297:up:LEFT,381:dn:DOWN,382:up:DOWN,416:dn:LEFT,417:up:LEFT,426:dn:UP,427:up:UP,431:dn:LEFT,432:up:LEFT,436:dn:DOWN,437:up:DOWN,441:dn:RIGHT,442:up:RIGHT
+SHOTS="426 431 441 450"

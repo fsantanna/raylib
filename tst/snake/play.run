@@ -1,0 +1,6 @@
+# Six fruits, a pause of 60 frames, the top wall at 546, an ENTER in that
+# same frame (ignored), a restart at 560, the right wall, a restart at 700.
+FRAMES=760
+SEED=1
+INPUT=61:dn:DOWN,62:up:DOWN,71:dn:LEFT,72:up:LEFT,81:dn:DOWN,82:up:DOWN,106:dn:LEFT,107:up:LEFT,146:dn:DOWN,147:up:DOWN,161:dn:RIGHT,162:up:RIGHT,200:dn:P,201:up:P,260:dn:P,261:up:P,331:dn:UP,332:up:UP,356:dn:LEFT,357:up:LEFT,441:dn:DOWN,442:up:DOWN,476:dn:LEFT,477:up:LEFT,486:dn:UP,487:up:UP,546:dn:ENTER,547:up:ENTER,560:dn:ENTER,561:up:ENTER,700:dn:ENTER,701:up:ENTER
+SHOTS="1 6 200 230 486 487 546 547 560 561 700 760"
