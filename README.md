@@ -64,6 +64,8 @@ tools/originals.sh      # the originals, with a trace, in build/orig/
 tools/ports.sh          # the ports, in build/port/
 tst/run.sh              # every scripted run of every port, against its stored results
 tools/compare.sh snake tst/snake/play.run     # one run, original against port
+tools/atmos.sh launcher.atm build/launcher    # the launcher: lists the games, runs one
+tools/bench.py; tools/stress.py; tools/bench_md.py   # the benchmark, into doc/bench.md
 ```
 
 A port runs on a desktop too, with raylib built for it; the test mode
@@ -71,11 +73,19 @@ needs the platform with no screen.
 
 ## State
 
+All 23 games are ported, each identical to its original on its scripted
+runs (55 runs; see [doc/table.md](doc/table.md)).
+
 - `raylib.atm`: the environment.
-- `classics/`: the 12 classics, each identical to the original on its
-  scripted runs. `classics/classic.atm` is the pause and game over that
-  most of them share.
+- `classics/`: the 12 classics. `classics/classic.atm` is the pause and
+  game over that they share.
+- `games/`: the 11 other games, with their assets. `games/screens.atm` is
+  the logo of raylib and the screens with their fades, that most share.
+- `launcher.atm`: lists the games and runs the one chosen.
+- [doc/case-study.md](doc/case-study.md): the patterns, with the C and the
+  Atmos of the shortest game for each, and where they stop.
 - [doc/table.md](doc/table.md): one row per game. [doc/state.md](doc/state.md):
   what became of each variable of the C. [doc/fidelity.md](doc/fidelity.md):
-  how the ports are compared, and what differs. [doc/compiler.md](doc/compiler.md):
+  how the ports are compared, and what differs. [doc/bench.md](doc/bench.md):
+  time and memory, C against Atmos. [doc/compiler.md](doc/compiler.md):
   what the port found in the compiler.

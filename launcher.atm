@@ -1,0 +1,67 @@
+;; The launcher: the 23 ports, in the order they were ported; UP and DOWN
+;; (or the mouse) choose one, ENTER (or a click) runs it, ESC quits.
+;;
+;;      tools/atmos.sh launcher.atm build/launcher
+;;      build/launcher                  (from the root of the repository)
+;;
+;; A port runs as a program of its own, from the directory of its assets,
+;; as the original does; the launcher waits for it to end.
+
+include "raylib.atm"
+
+```:prelude
+#include <stdlib.h>
+```
+
+val GAMES = [
+    ["snake", "classic"], ["floppy", "classic"], ["gold_fever", "classic"],
+    ["arkanoid", "classic"], ["asteroids_survival", "classic"], ["space_invaders", "classic"],
+    ["missile_commander", "classic"], ["gorilas", "classic"], ["asteroids", "classic"],
+    ["pang", "classic"], ["platformer", "classic"], ["tetris", "classic"],
+    ["raylife", "game"], ["wave_collector", "game"], ["repair", "game"],
+    ["cat_vs_roomba", "game"], ["light_my_ritual", "game"], ["transmission", "game"],
+    ["drturtle", "game"], ["just_do", "game"], ["skully_escape", "game"],
+    ["retro_maze_3d", "game"], ["koala_seasons", "game"],
+]
+val N = #GAMES
+val W, H = 640, 40 + (N * 24) + 40
+
+rl.window [title="raylib games in Atmos", width=W, height=H, fps=60]
+
+;; runs a port: the classics from build/port, the others from their assets
+func run (g) {
+    val name = g@0
+    val cmd = if g@1 == "classic" =>
+        "cd build/port && ./" ++ name =>
+        "cd games/" ++ name ++ " && ../../build/port/" ++ name
+    `system(rl_s($cmd));`
+}
+
+var sel = 0
+spawn {
+    loop on :rl.frame {
+        if rl.key_pressed('DOWN') { set sel = math.min(sel + 1, N - 1) }
+        if rl.key_pressed('UP') { set sel = math.max(sel - 1, 0) }
+        val i = (rl.mouse_y() - 40) // 24
+        if (i >= 0) && (i < N) && ((rl.mouse_dx() != 0) || (rl.mouse_dy() != 0)) { set sel = i }
+        if rl.key_pressed('ENTER') || (rl.mouse_pressed(0) && (i == sel)) {
+            run(GAMES@sel)
+        }
+    }
+}
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+        rl.text("raylib games, ported to Atmos", 20, 12, 20, rl.DARKGRAY)
+        loop i,g in GAMES {
+            val y = 40 + (i * 24)
+            if i == sel {
+                rl.rectangle(10, y - 2, W - 20, 24, rl.SKYBLUE)
+            }
+            rl.text(string.format("%2d  %s", i + 1, g@0), 20, y, 20, if i == sel => rl.DARKBLUE => rl.BLACK)
+            rl.text(g@1, W - 110, y, 20, rl.GRAY)
+        }
+        rl.text("UP/DOWN or mouse: choose    ENTER or click: play    ESC: quit", 20, H - 30, 10, rl.GRAY)
+    }
+}
+await :rl.quit
