@@ -1,5 +1,8 @@
-# The logo, level 00 with the U falling, the key 1 to level 01.
-FRAMES=900
+# The logo; the key 5 from the logo (no music); a click on a ring, then 5
+# again, which inits the level under the fade; the key 9, which inits the
+# level 08 and shows a level 09 never initialized (as the C: zeros), and a
+# click there; the keys 1 and 0.
+FRAMES=1200
 SEED=1
-INPUT=750:dn:1,751:up:1
-SHOTS="1 85 140 300 450 520 600 700 760 801 850 900"
+INPUT=300:dn:5,301:up:5,420:mv:450:360,420:md:0,421:mu:0,450:dn:5,451:up:5,600:dn:9,601:up:9,750:mv:640:360,750:md:0,751:mu:0,800:dn:1,801:up:1,950:dn:0,951:up:0
+SHOTS="1 85 140 152 300 330 360 400 421 451 480 520 600 650 700 751 800 900 1000 1100 1200"

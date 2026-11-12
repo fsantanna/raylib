@@ -433,7 +433,6 @@ func init09 () {
 }
 func update09 () {
     val L, c, a = L09, L09.color, L09.activated
-    if L.enable { set L.reset += 1 }
     if pressed() {
         loop i in 21 {
             if in_rec(mx(), my(), L.recs@i) {
@@ -466,15 +465,19 @@ func update09 () {
     }
     set L.done = all
 }
+func always09 () {                      ;; done or not, in every frame
+    if L09.enable { set L09.reset += 1 }
+}
 func draw09 () {
     loop i in 21 {
         rect(L09.recs@i, L09.color@i)
     }
 }
 
-;; By level: its statics, init, update, draw, the color of the frame of
-;; done, and the frames before a click goes on (the C counts the frames
-;; twice per frame once done, but in level 00).
+;; By level: its statics, init, update, draw, the frames before a click
+;; goes on (the C counts the frames twice per frame once done, but in level
+;; 00), the color of the frame of done, and what goes on in every frame,
+;; done or not.
 val LEVELS = [
     [L=L00, init=init00, update=update00, draw=draw00, first=29, again=30],
     [L=L01, init=init01, update=update01, draw=draw01, first=44, again=45],
@@ -485,7 +488,7 @@ val LEVELS = [
     [L=L06, init=init06, update=update06, draw=draw06, first=44, again=45],
     [L=L07, init=init07, update=update07, draw=draw07, first=44, again=45],
     [L=L08, init=init08, update=update08, draw=draw08, first=44, again=45],
-    [L=L09, init=init09, update=update09, draw=draw09, first=44, again=45, border=rl.RAYWHITE],
+    [L=L09, init=init09, update=update09, draw=draw09, first=44, again=45, border=rl.RAYWHITE, always=always09],
 ]
 loop _,v in LEVELS {
     set v.L.done, v.L.secs, v.L.frames = false, 0, 0
@@ -503,6 +506,11 @@ task Level (n) {
     val v = LEVELS@n
     val L = v.L
     par :any {
+        if v.always {
+            loop on :rl.frame { v.always() }
+        }
+        await false
+    } with {
         if L.done {
             await rl.Frames(v.again)
         } else {
