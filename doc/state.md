@@ -158,3 +158,24 @@ takes in the same frame. Left in the port for the trace only: `phase`.
 | `score` | score | `score` |
 
 Left in the port for the trace only: `phase`, `missiles_on`.
+
+## gorilas
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control | the loop of turns in `Play` ends when a team is gone |
+| `pause` | control | `Classic` |
+| `ballOnAir` | control: aiming, or the ball in the air | two phases of each turn, in sequence: a `watching :fire` while aiming, then a `watching :landed` while the ball flies |
+| `ball.active` | control: the speed is set in the first frame of the flight | the first frame of the flight, after `await :rl.frame` |
+| `explosion[].active` | control | gone: `explosions` holds the impact points; the unused slots, at (0,0), are one more point in the check, as in the C |
+| `playerTurn` | data: whose turn; never reset, so the winner starts the next game | `turn`, also across games |
+| `player[]` | drawn, and data; never fully reset (a player beyond the last building keeps its old y) | `players`, also across games |
+| `player[].isAlive` | data: who is left | `alive` |
+| `player[].isPlayer` | constant, never read | gone |
+| `player[].impactPoint` | data, only written | gone (the explosions keep the points) |
+| `building[]` | drawn | `buildings` |
+| `ball.position`, `ball.speed` | drawn, and data | `ball` |
+| `explosionNumber` (static) | control: the next slot | gone |
+
+Left in the port for the trace only: `phase`.

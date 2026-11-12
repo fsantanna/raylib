@@ -1,0 +1,6 @@
+# Seed 3: another city; three shots on buildings and a hit (game over at
+# frame 321). Made by gen.py.
+FRAMES=360
+SEED=3
+INPUT=21:mv:201:271,41:md:0,42:mu:0,73:mv:678:163,93:md:0,94:mu:0,157:mv:201:271,177:md:0,178:mu:0,219:mv:589:57,239:md:0,240:mu:0
+SHOTS="1 41 42 60 100 150 200 250 300 320 321 360"

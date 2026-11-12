@@ -382,6 +382,7 @@ val rl = [
     sinf = func (x) { `:number.float (double)sinf((float)a_dbl($x))` },
     cosf = func (x) { `:number.float (double)cosf((float)a_dbl($x))` },
     tanf = func (x) { `:number.float (double)tanf((float)a_dbl($x))` },
+    asin = func (x) { `:number.float asin(a_dbl($x))` },
 
     ;; rl.random(min, max): GetRandomValue, both included
     random = func (min, max) {

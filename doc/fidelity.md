@@ -228,3 +228,31 @@ This is the classic where the slots of the C decide the most:
   which is the order of their slots until the 101st missile (8000 frames of
   play) reuses slot 0; and the ring of explosions would overwrite a live
   explosion only with 100 alive at once. No run comes near either.
+
+## gorilas
+
+Same as the original on its runs `play` (648 frames, 32 screens, seed 2:
+three shots on buildings and a hit, a pause in a flight, an ENTER in the
+frame of the game over, a restart in which the winner shoots first, two
+shots and a hit) and `seed3` (360 frames, 12 screens: another city).
+
+Trace: frame, phase, turn, ball, power and angle of each player.
+
+- **Floats and integers.** The power and the angle of the aim are
+  integers, from `sqrt` and `asin` on doubles of differences on floats; the
+  ball flies on floats. The port does the same steps (`rl.f32`, `rl.asin`,
+  `math.floor`).
+- **The unused explosions.** The ball goes through the 200 slots of
+  explosions, used or not; the unused ones are at (0,0) with their radius
+  of 30, so there is a hole at the corner of the screen. The port checks
+  the impact points and (0,0).
+- **What outlives a game.** `playerTurn` is never reset, so the player who
+  won shoots first in the next game; the players are never fully reset, so
+  one whose x falls beyond the last building keeps the y of the last game
+  (0 in the first, drawn at the top). The port keeps `turn` and `players`
+  as globals.
+- **The frames of a turn**, as in the C: the click ends the aim (no
+  triangle is drawn in that frame, nor the ball); the ball takes its speed
+  and moves from the next frame; in the frame it lands the next player's
+  aim is drawn with the point of its last turn, and it follows the mouse
+  from the frame after.

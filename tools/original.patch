@@ -104,6 +104,31 @@ index c067c9f..d6b1506 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/gorilas.c b/classics/src/gorilas.c
+index 242d925..1be5547 100644
+--- a/classics/src/gorilas.c
++++ b/classics/src/gorilas.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <time.h>
+@@ -230,6 +233,10 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0) printf("%d %s %d %.4f %.4f %d %d %d %d\n", RltFrame(), gameOver? "over" : (pause? "pause" : "play"),
++        playerTurn, ball.position.x, ball.position.y, player[0].aimingPower, player[0].aimingAngle, player[1].aimingPower, player[1].aimingAngle);
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/missile_commander.c b/classics/src/missile_commander.c
 index 408fbe3..b47f471 100644
 --- a/classics/src/missile_commander.c

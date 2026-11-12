@@ -1,0 +1,8 @@
+# Seed 2: three shots on buildings and a hit, with a pause of 60 frames in
+# a flight; an ENTER in the frame of the game over (ignored), a restart in
+# which the winner shoots first (the turn is not reset), two shots on
+# buildings and a hit. Made by gen.py.
+FRAMES=648
+SEED=2
+INPUT=21:mv:222:280,41:md:0,42:mu:0,73:mv:599:195,93:md:0,94:mu:0,125:mv:222:280,130:dn:P,131:up:P,190:dn:P,191:up:P,205:md:0,206:mu:0,247:mv:536:86,267:md:0,268:mu:0,347:dn:ENTER,348:up:ENTER,377:dn:ENTER,378:up:ENTER,399:mv:611:172,419:md:0,420:mu:0,463:mv:142:253,483:md:0,484:mu:0,515:mv:535:59,535:md:0,536:mu:0
+SHOTS="1 41 42 66 93 94 118 130 160 205 206 230 267 268 292 346 347 348 377 378 419 420 444 483 484 508 535 536 560 617 618 648"

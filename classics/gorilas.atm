@@ -1,0 +1,189 @@
+;; raylib - classic game: gorilas
+;;
+;; Sample game developed by Marc Palau and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/gorilas.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `ballOnAir`, `ball.active`, and the
+;; `active` flags of the explosions of the C became tasks, awaits, and a
+;; toggle.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H    = 800, 450
+val f32     = rl.f32
+val PI      = f32(3.14159265358979323846)
+val DEG2RAD = f32(PI/180)
+val RAD2DEG = f32(180/PI)
+val GRAVITY = f32(f32(9.81)/60)
+
+rl.window [title="classic game: gorilas", width=W, height=H, fps=60]
+
+;; As in the C, these outlive a game: the turn, and the players, whose
+;; fields InitPlayers may leave as they were (a player beyond the last
+;; building keeps its old y).
+var turn = 0
+val players = [ [x=0, y=0, left=true], [x=0, y=0, left=false] ]
+loop _,p in players {
+    set p.ax, p.ay, p.px, p.py = 0, 0, 0, 0      ;; the aiming point, the previous one
+    set p.power, p.angle, p.ppower, p.pangle = 0, 0, 0, 0
+}
+val ball = [x=0, y=0, sx=0, sy=0]
+var buildings  = []             ;; [x=, y=, w=, h=, gray=]
+var explosions = []             ;; the impact points
+var alive = [true, true]
+
+;; The aim follows the mouse, above the player and toward the other team;
+;; true on a click.
+func aim (p) {
+    val mx, my = rl.mouse_x(), rl.mouse_y()
+    if (my <= p.y) && (if p.left => (mx >= p.x) => (mx <= p.x)) {
+        set p.power = math.floor(math.sqrt(math.pow(f32(p.x - mx), 2) + math.pow(f32(p.y - my), 2)))
+        set p.angle = math.floor(rl.asin(f32(f32(p.y - my) / p.power)) * RAD2DEG)
+        set p.ax, p.ay = mx, my
+        if rl.mouse_pressed(0) {
+            set p.px, p.py, p.ppower, p.pangle = p.ax, p.ay, p.power, p.angle
+            set ball.x, ball.y = p.x, p.y
+            return true
+        }
+    } else {
+        set p.ax, p.ay, p.power, p.angle = p.x, p.y, 0, 0
+    }
+    false
+}
+
+;; One frame of the ball: :miss, :hit (a player), :boom (a building), or nil
+;; while it flies. As in the C, it goes through its own player and through
+;; the explosions, and the unused slots of explosions, at (0,0), count too.
+func fly () {
+    set ball.x, ball.y = f32(ball.x + ball.sx), f32(ball.y + ball.sy)
+    set ball.sy = f32(ball.sy + GRAVITY)
+    ifs {
+        (ball.x + 10) < 0 => :miss
+        (ball.x - 10) > W => :miss
+        else => do :fly {
+            loop i,p in players {
+                if rl.check_collision_circle_rec(ball.x, ball.y, 10, p.x - 20, p.y - 20, 40, 40) {
+                    if i == turn {
+                        escape :fly, nil
+                    }
+                    set alive@i = false
+                    escape :fly, :hit
+                }
+            }
+            loop _,e in explosions ++ [[x=0, y=0]] {
+                if rl.check_collision_circles(ball.x, ball.y, 10, e.x, e.y, 20) {
+                    escape :fly, nil
+                }
+            }
+            loop _,b in buildings {
+                if rl.check_collision_circle_rec(ball.x, ball.y, 10, b.x, b.y, b.w, b.h) {
+                    vector.insert(explosions, [x=ball.x, y=ball.y + 10])
+                    escape :fly, :boom
+                }
+            }
+            nil
+        }
+    }
+}
+
+;; One game: turns until a team is gone.
+task Play () {
+    ;; the buildings: a width, a height, and a gray, each from the left
+    set buildings = []
+    val mean = f32(f32(W/15) + 1)
+    var x = 0
+    loop _ in 15 {
+        val w = rl.random(math.floor(f32(f32(f32(mean*85)/100) + 1)), math.floor(f32(f32(mean*130)/100)))
+        val h = rl.random(20, 60)
+        val g = rl.random(120, 200)
+        vector.insert(buildings, [x=x, y=H - ((H*h)//100), w=w, h=((H*h)//100) + 1, gray=g])
+        set x += w
+    }
+    ;; the players, on top of a building near each side
+    loop i,p in players {
+        set alive@i = true
+        set p.x = if p.left => rl.random(40, 160) => (W - rl.random(40, 160))
+        loop j,b in buildings {
+            if b.x > p.x {
+                val c = buildings@(j-1)
+                set p.x, p.y = f32(c.x + (c.w/2)), c.y - 20
+                break
+            }
+        }
+        set p.ax, p.ay, p.px, p.py = p.x, p.y, p.x, p.y
+        set p.power, p.angle, p.ppower, p.pangle = 0, 0, 0, 0
+    }
+    set explosions = []
+
+    spawn {
+        loop on :rl.draw {
+            loop _,b in buildings {
+                rl.rectangle_v(b.x, b.y, b.w, b.h, rl.color(b.gray, b.gray, b.gray, 255))
+            }
+            loop _,e in explosions {
+                rl.circle(e.x, e.y, 30, rl.RAYWHITE)
+            }
+            loop i,p in players {
+                if alive@i {
+                    rl.rectangle(p.x - 20, p.y - 20, 40, 40, if p.left => rl.BLUE => rl.RED)
+                }
+            }
+        }
+    }
+
+    loop {
+        val p = players@turn
+        ;; aiming, until a click
+        watching :fire {
+            spawn {
+                loop on :rl.frame {
+                    if aim(p) {
+                        emit :fire
+                    }
+                }
+            }
+            val d = if p.left => -10 => 10
+            loop on :rl.draw {
+                rl.triangle(p.x - 10, p.y + d, p.x + 10, p.y - d, p.px, p.py, rl.GRAY)
+                rl.triangle(p.x - 10, p.y + d, p.x + 10, p.y - d, p.ax, p.ay, if p.left => rl.DARKBLUE => rl.MAROON)
+            }
+        }
+        ;; the ball, from the next frame on, until it lands
+        await :rl.frame
+        val side = if p.left => 1 => -1
+        set ball.sx = f32((((side * math.cos(f32(p.pangle*DEG2RAD))) * p.ppower) * 3) / 60)
+        set ball.sy = f32((((-math.sin(f32(p.pangle*DEG2RAD))) * p.ppower) * 3) / 60)
+        watching :landed {
+            spawn {
+                loop on :rl.draw {
+                    rl.circle(ball.x, ball.y, 10, rl.MAROON)
+                }
+            }
+            loop {
+                val r = fly()
+                if r {
+                    emit :landed
+                }
+                await :rl.frame
+            }
+        }
+        until !alive@0 || !alive@1
+        set turn = (turn + 1) % 2
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %s %d %.4f %.4f %d %d %d %d", rl.frame(), phase, turn, ball.x, ball.y,
+                (players@0).power, (players@0).angle, (players@1).power, (players@1).angle))
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)

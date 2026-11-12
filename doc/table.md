@@ -24,3 +24,4 @@ the runs: no number here is typed by hand.
 | asteroids_survival | 241 | 182 | 2262 | 1471 | 3 | 0 | 2 (4531 frames, 22 screens) | yes |
 | space_invaders | 271 | 207 | 1903 | 1252 | 9 | 1 | 2 (5477 frames, 26 screens) | yes |
 | missile_commander | 343 | 202 | 2796 | 1615 | 10 | 4 | 2 (6812 frames, 34 screens) | yes |
+| gorilas | 351 | 183 | 2994 | 1662 | 6 | 0 | 2 (1008 frames, 44 screens) | yes |
