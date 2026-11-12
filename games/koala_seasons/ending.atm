@@ -1,0 +1,4 @@
+;; (to come: the ending)
+func ending_init () { }
+func ending_trace () { "" }
+task Ending () { await false }

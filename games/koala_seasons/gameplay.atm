@@ -1,0 +1,4 @@
+;; (to come: the gameplay)
+func gameplay_init () { }
+func gameplay_trace () { "" }
+task Gameplay () { await false }

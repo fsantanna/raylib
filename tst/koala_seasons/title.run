@@ -1,0 +1,5 @@
+# The logo, the title: its season (the seed chooses it), its particles,
+# the bounce, the blink of "Press to play".
+FRAMES=1000
+SEED=1
+SHOTS="1 140 300 500 525 526 527 560 600 645 646 700 800 1000"

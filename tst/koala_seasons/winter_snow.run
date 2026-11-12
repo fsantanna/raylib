@@ -1,0 +1,4 @@
+# The title in winter, with no storm (the seed): snow.
+FRAMES=700
+SEED=13
+SHOTS="300 600 700"

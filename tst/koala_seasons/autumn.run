@@ -1,0 +1,4 @@
+# The title in its season by the seed: a storm of rain.
+FRAMES=700
+SEED=27
+SHOTS="300 600 700"

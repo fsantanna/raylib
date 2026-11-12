@@ -1,0 +1,481 @@
+;; The title of koala_seasons (`screen_title.c`): the scenery of a season
+;; with its particles, the title that bounces down, and "Press to play".
+;;
+;; The statics of the C are the table `T`. A particle system is a table
+;; with its particles (a list), as the C has it; the systems go in the order
+;; of the C, which draws from the random generator particle by particle.
+
+func particle (size, rot, alpha) {
+    [x=0, y=0, rot=rot, size=size, alpha=alpha, phy=0, active=false, color=rl.WHITE]
+}
+func system (n) {
+    val ps = []
+    loop i in n { set ps@i = particle(0, 0, 1) }
+    [active=false, spawn=0, max=0, ps=ps]
+}
+func ray () {
+    [x=0, y=0, color=0xFFFFB6FF, alpha=0, size=0, rot=0, active=false, fading=false, delay=0]
+}
+func rays (n) {
+    val ps = []
+    loop i in n { set ps@i = ray() }
+    [active=false, spawn=0, max=0, ps=ps]
+}
+
+val T = [
+    frames=0, global=0, frame=0, this=0, value1=0, value2=0, back_offset=0, front_offset=0,
+    snow=system(128), back_snow=system(128), dandelion=system(128), dandelion_back=system(128),
+    planetree=system(128), back_planetree=system(128), flower=system(128), back_flower=system(128),
+    rain=system(128), back_rain=system(128), rain_storm=system(1024 + 16), snow_storm=system(1024),
+    rays=rays(20), back_rays=rays(20),
+    c0=0, c1=0, c2=0, c3=0,
+]
+
+;; (float)GetRandomValue(a, b)/10
+func rnd10 (a, b) { f32(rl.random(a, b) / 10) }
+
+func title_init () {
+    set T.frames = 0
+    set initSeason = rl.random(0, 3)
+    set T.back_offset = rl.random(10, 100)
+    set T.front_offset = rl.random(100, 200)
+    set rainChance = rl.random(0, 100)
+    loop _,k in [:snow, :back_snow, :planetree, :back_planetree, :dandelion, :flower, :back_flower, :rain_storm, :snow_storm, :rays, :back_rays] {
+        set (T@k).active = false
+    }
+    loop j in 128 {
+        val sn, bs, pt, bp = T.snow.ps@j, T.back_snow.ps@j, T.planetree.ps@j, T.back_planetree.ps@j
+        set sn.active, sn.x, sn.y, sn.size, sn.rot, sn.color, sn.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bs.active, bs.x, bs.y, bs.size, bs.rot, bs.color, bs.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        set pt.active, pt.x, pt.y, pt.size, pt.rot, pt.color, pt.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bp.active, bp.x, bp.y, bp.size, bp.rot, bp.color, bp.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        val dn, db = T.dandelion.ps@j, T.dandelion_back.ps@j
+        set dn.active, dn.x, dn.y, dn.size, dn.rot, dn.color, dn.alpha = false, 0, 0, rnd10(3, 9), 0, rl.WHITE, 1
+        set dn.phy = rl.random(0, 180)
+        set db.active, db.x, db.y, db.size, db.rot, db.color, db.alpha = false, 0, 0, rnd10(2, 8), 0, rl.WHITE, f32(0.7)
+        set db.phy = rl.random(0, 180)
+        val fl, bf, rn, br = T.flower.ps@j, T.back_flower.ps@j, T.rain.ps@j, T.back_rain.ps@j
+        set fl.active, fl.x, fl.y, fl.size, fl.rot, fl.color, fl.alpha = false, 0, 0, rnd10(3, 9), rl.random(0, 360), rl.WHITE, 1
+        set bf.active, bf.x, bf.y, bf.size, bf.rot, bf.color, bf.alpha = false, 0, 0, rnd10(2, 8), rl.random(0, 360), rl.WHITE, f32(0.7)
+        set rn.active, rn.x, rn.y, rn.size, rn.rot, rn.color, rn.alpha = false, 0, 0, rnd10(3, 9), -20, rl.WHITE, 1
+        set br.active, br.x, br.y, br.size, br.rot, br.color, br.alpha = false, 0, 0, rnd10(2, 8), -20, rl.WHITE, f32(0.7)
+    }
+    loop j in 1024 {
+        val p = T.rain_storm.ps@j
+        set p.active, p.x, p.y, p.size, p.rot, p.color, p.alpha = false, 0, 0, rnd10(3, 9), -40, rl.WHITE, 1
+    }
+    loop j in 256 {
+        val p = T.snow_storm.ps@j
+        set p.active, p.x, p.y, p.size, p.rot, p.color, p.alpha = false, 0, 0, rnd10(4, 8), 40, rl.WHITE, 1
+    }
+    loop i in 20 {
+        val r, b = T.rays.ps@i, T.back_rays.ps@i
+        set r.x, r.y, r.color, r.alpha, r.size, r.rot, r.active, r.fading, r.delay = 0, 0, 0xFFFFB6FF, 0, rnd10(15, 20), 0, false, false, 0
+        set b.x, b.y, b.color, b.alpha, b.size, b.rot, b.active, b.fading, b.delay = 0, 0, 0xFFFFB6FF, 0, rnd10(5, 10), 0, false, false, 0
+    }
+    val km = ATLAS01.gameplay_koala_menu
+    set T.menu = [x=km.x, y=km.y, w=km.w / 2, h=km.h]
+    val w, h = rl.measure_ex(font, "PRESS TO PLAY", SIZE, 2)
+    set T.text_w, T.text_h = w, h
+}
+
+;; BounceEaseOut of the C, in floats
+func bounce (t, b, c, d) {
+    var t = f32(t / d)
+    if t < f32(1 / f32(2.75)) {
+        f32(f32(c * f32(f32(f32(7.5625) * t) * t)) + b)
+    } else {
+        if t < f32(2 / f32(2.75)) {
+            set t = f32(t - f32(f32(1.5) / f32(2.75)))
+            f32(f32(c * f32(f32(f32(f32(7.5625) * t) * t) + f32(0.75))) + b)
+        } else {
+            if t < (2.5 / 2.75) {
+                set t = f32(t - f32(f32(2.25) / f32(2.75)))
+                f32(f32(c * f32(f32(f32(f32(7.5625) * t) * t) + f32(0.9375))) + b)
+            } else {
+                set t = f32(t - f32(f32(2.625) / f32(2.75)))
+                f32(f32(c * f32(f32(f32(f32(7.5625) * t) * t) + f32(0.984375))) + b)
+            }
+        }
+    }
+}
+
+;; One particle of a system starts, if one is free and it is time: at the
+;; top, somewhere; the next in [lo, hi] frames.
+func spawn_one (s, p, lo, hi) {
+    if !p.active && (s.spawn >= s.max) {
+        set p.active = true
+        set p.x, p.y = rl.random(0, W + 200), -10
+        set s.spawn = 0
+        set s.max = rl.random(lo, hi)
+    }
+}
+func spawn_ray (s, r, lo, hi) {
+    if !r.active && (s.spawn >= s.max) {
+        set r.active, r.alpha = true, 0
+        set r.size = rl.random(lo, hi) // 10
+        set r.x, r.y = rl.random(300, W + 200), 0
+        set r.rot = -35
+        set s.spawn = 0
+        set r.delay = 0
+        set s.max = rl.random(20, 50)
+    }
+}
+func fall (s, n, dy, dx, drot) {
+    loop i in n {
+        val p = s.ps@i
+        if p.active {
+            set p.y = f32(p.y + dy)
+            set p.x = f32(p.x - dx)
+            if drot { set p.rot = f32(p.rot + drot) }
+            if p.y >= H { set p.active = false }
+        }
+    }
+}
+;; the rotation of a dandelion: -(30*sin(2*PI/120*frame + phase) + 30)
+val PI2_120 = f32(f32(2 * f32(math.pi)) / 120)
+func dandelion_rot (frame, phy) {
+    -((30 * math.sin(f32(f32(PI2_120 * frame) + phy))) + 30)
+}
+func update_rays (s, dx) {
+    loop _,r in s.ps {
+        if r.active {
+            set r.x = f32(r.x - dx)
+            if r.fading {
+                set r.alpha = f32(r.alpha - f32(0.01))
+                if r.alpha <= 0 {
+                    set r.alpha = 0
+                    set r.delay = f32(r.delay + 1)
+                    if r.delay >= 30 {
+                        set r.active, r.delay, r.fading = false, 0, false
+                    }
+                }
+            } else {
+                set r.alpha = f32(r.alpha + f32(0.01))
+                if r.alpha >= f32(0.5) {
+                    set r.alpha = f32(0.5)
+                    set r.delay = f32(r.delay + 1)
+                    if r.delay >= 30 {
+                        set r.delay, r.fading = 0, true
+                    }
+                }
+            }
+        }
+    }
+}
+
+val SEASON_COLORS = [                   ;; color00..color03, by season
+    [0x81AC56FF, 0x91A57DFF, 0xA18249FF, 0xC66733FF],   ;; summer
+    [0xF2713EFF, 0xBE8772FF, 0x908265FF, 0xD6853AFF],   ;; fall
+    [0x8282B5FF, 0x9191A6FF, 0x688E90FF, 0x398CADFF],   ;; winter
+    [0xC4B031FF, 0xB2A343FF, 0x858F5AFF, 0x859C2AFF],   ;; spring
+]
+
+func title_update () {
+    set T.frames += 1
+    set T.global += 1
+    if T.frames < 120 {
+        set T.value1 = bounce(T.frames, -100, 200, 120)
+        set T.value2 = bounce(T.frames, 700, f32(320 - 700), 120)
+    }
+    set T.this += 1
+    if T.this >= 40 {
+        set T.frame += 1
+        set T.this = 0
+    }
+    if T.frame > 1 { set T.frame = 0 }
+    set T.menu.x = ATLAS01.gameplay_koala_menu.x + (T.menu.w * T.frame)
+
+    if initSeason == 0 {
+        set T.dandelion.active, T.dandelion_back.active, T.rays.active, T.back_rays.active = true, true, true, true
+        set T.rain.active, T.rain_storm.active, T.back_rain.active = false, false, false
+    } else {
+        if initSeason == 1 {
+            if rainChance > 40 {
+                set T.planetree.active, T.back_planetree.active = true, true
+                set T.rain.active, T.back_rain.active = false, false
+            } else {
+                set T.rain_storm.active, T.back_rain.active = true, false
+            }
+        } else {
+            if initSeason == 2 {
+                if rainChance > 40 {
+                    set T.snow.active, T.back_snow.active = true, true
+                } else {
+                    set T.snow_storm.active, T.back_snow.active = true, true
+                }
+                set T.rain.active, T.rain_storm.active, T.back_rain.active = false, false, false
+            } else {
+                set T.flower.active, T.back_flower.active = true, true
+                set T.rain.active, T.rain_storm.active, T.back_rain.active = false, false, false
+            }
+        }
+    }
+    val cs = SEASON_COLORS@initSeason
+    set T.c0, T.c1, T.c2, T.c3 = cs@0, cs@1, cs@2, cs@3
+
+    ;; spawns, in the order of the C
+    if T.snow.active {
+        set T.snow.spawn += 1
+        loop _,p in T.snow.ps { spawn_one(T.snow, p, 5, 20) }
+    }
+    if T.back_snow.active {
+        set T.back_snow.spawn += 1
+        loop _,p in T.back_snow.ps { spawn_one(T.back_snow, p, 3, 10) }
+    }
+    loop _,pair in [[T.planetree, T.back_planetree], [T.dandelion, T.dandelion_back], [T.flower, T.back_flower]] {
+        val f, b = pair@0, pair@1
+        if f.active {
+            set f.spawn += 1
+            set b.spawn += 1
+            loop i in 128 {
+                spawn_one(f, f.ps@i, 5, 20)
+                spawn_one(b, b.ps@i, 3, 10)
+            }
+        }
+    }
+    val rs = T.rain_storm
+    if rs.active {
+        set rs.spawn += 1
+        loop i in 1024 {
+            if !(rs.ps@i).active && (rs.spawn >= rs.max) {
+                loop j in 16 {
+                    val p = rs.ps@(i + j)
+                    set p.active = true
+                    set p.x = rl.random(100, W + 1000)
+                    set p.y = rl.random(-10, -20)
+                }
+                set rs.spawn, rs.max = 0, 4
+            }
+        }
+    }
+    val ss = T.snow_storm
+    if ss.active {
+        set ss.spawn += 1
+        loop i in 256 {
+            val p = ss.ps@i
+            if !p.active && (ss.spawn >= ss.max) {
+                set p.active = true
+                set p.x, p.y = rl.random(100, W + 800), -10
+                set ss.spawn = 0
+                set ss.max = rl.random(1, 2)
+            }
+        }
+    }
+    if T.rays.active {
+        set T.rays.spawn += 1
+        set T.back_rays.spawn += 1
+        loop i in 20 {
+            spawn_ray(T.rays, T.rays.ps@i, 10, 20)
+            spawn_ray(T.back_rays, T.back_rays.ps@i, 5, 15)
+        }
+    }
+    if T.rain.active {
+        set T.rain.spawn += 1
+        loop _,p in T.rain.ps { spawn_one(T.rain, p, 1, 8) }
+    }
+    if T.back_rain.active {
+        set T.back_rain.spawn += 1
+        loop _,p in T.back_rain.ps { spawn_one(T.back_rain, p, 3, 10) }
+    }
+
+    ;; the moves
+    fall(T.snow, 128, 2, 2, 0.5)
+    fall(T.back_snow, 128, 4, 3, 0.5)
+    fall(T.planetree, 128, 4, 2, 0.5)
+    fall(T.back_planetree, 128, 4, 3, 0.5)
+    loop i in 128 {
+        val d, b = T.dandelion.ps@i, T.dandelion_back.ps@i
+        if d.active {
+            set d.y = f32(d.y + 2.5)
+            set d.x = f32(d.x - 2)
+            set d.rot = f32(dandelion_rot(T.global, d.phy))
+            if d.y >= H { set d.active = false }
+        }
+        if b.active {
+            set b.y = f32(b.y + 2)
+            set b.x = f32(b.x - 3)
+            set b.rot = f32(dandelion_rot(T.global, d.phy))
+            if b.y >= H { set b.active = false }
+        }
+    }
+    fall(T.flower, 128, 2.5, 2, 0.5)
+    fall(T.back_flower, 128, 2, 3, 0.5)
+    fall(T.rain, 128, 4, 5, nil)
+    fall(T.back_rain, 128, 3, 3, nil)
+    loop i in 1024 {
+        val p = rs.ps@i
+        if p.active {
+            set p.y = f32(p.y + 12)
+            set p.x = f32(p.x - 15)
+            if p.y >= H { set p.active = false }
+            if !rs.active { set p.alpha = f32(p.alpha - 0.01) }
+        }
+    }
+    fall(T.snow_storm, 256, 12, 15, 0.5)
+    update_rays(T.rays, 0.5)
+    update_rays(T.back_rays, 0.5)
+}
+
+;; A particle drawn as the C: centered, scaled, rotated, faded.
+func draw_particle (atlas, r, p, c) {
+    val w, h = r.w * p.size, r.h * p.size
+    rl.draw_texture_pro(atlas, r.x, r.y, r.w, r.h, p.x, p.y, w, h, w / 2, h / 2, p.rot, rl.fade(c, p.alpha))
+}
+func draw_rect (atlas, r, x, y, w, h, c) {
+    rl.draw_texture_pro(atlas, r.x, r.y, r.w, r.h, x, y, w, h, 0, 0, 0, c)
+}
+
+;; The parallax of the title and of the gameplay: three layers of trees
+;; and ground; `scroll` is that of the gameplay (0 in the title), and `again`
+;; draws a second copy, one screen to the right.
+func parallax_front (offset, scroll, c1, c2, again) {
+    val g = ATLAS02.gameplay_back_ground01
+    val YS = [60, 60, 55, 60, 60, 55, 60, 60]
+    loop k in (if again => 2 => 1) {
+        val dx = int(scroll) + (k * W)
+        loop i in 8 {
+            val t = ATLAS02@(string.format("gameplay_back_tree%02d_layer01", i + 1))
+            val size = if (i == 2) && (k == 0) => ATLAS02.gameplay_back_tree02_layer01 => t
+            draw_rect(atlas2, t, dx + offset + (140 * i), YS@i, size.w * 2, size.h * 2, c2)
+        }
+        draw_rect(atlas2, g, dx, 559, g.w * 2, g.h * 2, c1)
+        rl.draw_texture_pro(atlas2, g.x, g.y + g.h, g.w, -g.h, dx, -33, g.w * 2, g.h * 2, 0, 0, 0, c1)
+    }
+}
+func parallax_middle (scroll, c1, c2, again) {
+    val g = ATLAS02.gameplay_back_ground02
+    val dx = int(scroll)
+    loop i in 8 {
+        val t = ATLAS02@(string.format("gameplay_back_tree%02d_layer02", i + 1))
+        draw_rect(atlas2, t, dx + (140 * i), 67, t.w * 2, t.h * 2, c2)
+    }
+    draw_rect(atlas2, g, dx, 509, g.w * 2, g.h * 2, c1)
+    rl.draw_texture_pro(atlas2, g.x, g.y + g.h, g.w, -g.h, dx, 19, g.w * 2, g.h * 2, 0, 0, 0, c1)
+    if again {
+        loop i in 7 {
+            val t = ATLAS02@(string.format("gameplay_back_tree%02d_layer02", i + 2))
+            draw_rect(atlas2, t, dx + W + (140 * (i + 1)), 67, t.w * 2, t.h * 2, c2)
+        }
+        val t = ATLAS02.gameplay_back_tree01_layer02
+        draw_rect(atlas2, t, dx + W, 67, t.w * 2, t.h * 2, c2)
+        draw_rect(atlas2, g, dx + W, 509, g.w * 2, g.h * 2, c1)
+        rl.draw_texture_pro(atlas2, g.x, g.y + g.h, g.w, -g.h, dx + W, 19, g.w * 2, g.h * 2, 0, 0, 0, c1)
+    }
+}
+func parallax_back (offset, scroll, c1, c2, again) {
+    val g = ATLAS02.gameplay_back_ground03
+    loop k in (if again => 2 => 1) {
+        val dx = int(scroll) + (k * W)
+        loop i in 8 {
+            val t = ATLAS02@(string.format("gameplay_back_tree%02d_layer03", i + 1))
+            draw_rect(atlas2, t, dx + offset + (140 * i), 67, t.w * 2, t.h * 2, c2)
+        }
+        draw_rect(atlas2, g, dx, 469, g.w * 2, g.h * 2, c1)
+        rl.draw_texture_pro(atlas2, g.x, g.y + g.h, g.w, -g.h, dx, 67, g.w * 2, g.h * 2, 0, 0, 0, c1)
+    }
+}
+
+func title_draw () {
+    rl.begin_shader_mode(blend)
+    val bg = ATLAS02.gameplay_background
+    draw_rect(atlas2, bg, 0, 0, bg.w * 2, bg.h * 2, T.c2)
+    parallax_back(T.back_offset, 0, T.c1, T.c2, false)
+    parallax_middle(0, T.c1, T.c2, false)
+    loop i in 128 {
+        val p1, p2, p3, p4, p5 = T.back_snow.ps@i, T.back_planetree.ps@i, T.dandelion_back.ps@i, T.back_flower.ps@i, T.back_rain.ps@i
+        if p1.active { draw_particle(atlas2, ATLAS02.particle_icecrystal_bw, p1, 0x90D6FFFF) }
+        if p2.active { draw_particle(atlas2, ATLAS02.particle_planetreeleaf_bw, p2, 0xB35606FF) }
+        if p3.active { draw_particle(atlas2, ATLAS02.particle_dandelion_bw, p3, 0xCAA77EFF) }
+        if p4.active { draw_particle(atlas2, ATLAS02.particle_ecualyptusflower_bw, p4, 0xDA546CFF) }
+        if p5.active { draw_particle(atlas2, ATLAS02.particle_waterdrop_bw, p5, 0x90B7BBFF) }
+    }
+    loop _,r in T.back_rays.ps {
+        if r.active { draw_particle(atlas2, ATLAS02.gameplay_back_fx_lightraymid, r, rl.GOLD) }
+    }
+    parallax_front(T.front_offset, 0, T.c1, T.c2, false)
+    loop i in 5 {
+        draw_rect(atlas2, ATLAS02.gameplay_props_tree, 150 + (200 * i), 0, 43, 720, T.c3)
+    }
+    rl.end_shader_mode()
+    rl.draw_texture_rec(atlas1, T.menu.x, T.menu.y, T.menu.w, T.menu.h, 350 - 35, 100 - 40, rl.WHITE)
+    rl.begin_shader_mode(blend)
+    val g0 = ATLAS02.gameplay_back_ground00
+    draw_rect(atlas2, g0, 0, 637, g0.w * 2, g0.h * 2, T.c0)
+    rl.end_shader_mode()
+    val tt = ATLAS01.title_titletext
+    val tx = f32(f32(W * f32(0.49)) - (tt.w / 2))
+    rl.draw_texture_pro(atlas1, tt.x, tt.y, tt.w, 230, tx, T.value1, tt.w, 235, 0, 0, 0, rl.WHITE)
+    rl.draw_texture_pro(atlas1, tt.x, tt.y + 232, tt.w, 116, tx, T.value2, tt.w, 116, 0, 0, 0, rl.WHITE)
+    if (((T.frames // 60) % 2) == 1) && (T.frames >= 120) {
+        rl.text_ex(font, "Press to play", f32((W // 2) - f32(T.text_w / 2)), f32((H // 2) + f32(T.text_h * 2)), SIZE, 2, 0xF7EFD1FF)
+    }
+    loop i in 128 {
+        val p1, p2, p3, p4, p5 = T.snow.ps@i, T.planetree.ps@i, T.dandelion.ps@i, T.flower.ps@i, T.rain.ps@i
+        if p1.active { draw_particle(atlas1, ATLAS01.particle_icecrystal, p1, p1.color) }
+        if p2.active { draw_particle(atlas1, ATLAS01.particle_planetreeleaf, p2, p2.color) }
+        if p3.active { draw_particle(atlas1, ATLAS01.particle_dandelion, p3, p3.color) }
+        if p4.active { draw_particle(atlas1, ATLAS01.particle_ecualyptusflower, p4, p4.color) }
+        if p5.active { draw_particle(atlas1, ATLAS01.particle_waterdrop, p5, p5.color) }
+    }
+    loop i in 1024 {
+        val p = T.rain_storm.ps@i
+        if p.active { draw_particle(atlas1, ATLAS01.particle_waterdrop, p, p.color) }
+    }
+    loop i in 256 {
+        val p = T.snow_storm.ps@i
+        if p.active { draw_particle(atlas1, ATLAS01.particle_icecrystal, p, p.color) }
+    }
+    loop _,r in T.rays.ps {
+        if r.active { draw_particle(atlas1, ATLAS01.gameplay_fx_lightraymid, r, r.color) }
+    }
+}
+
+;; The title: its scenery goes on; after the bounce (120 frames), ENTER
+;; starts a game.
+task Title () {
+    title_init()
+    spawn {
+        loop on :rl.draw { title_draw() }
+    }
+    loop on :rl.frame {
+        title_update()
+        until rl.key_pressed('ENTER') && (T.frames >= 120)
+    }
+    set pub = :gameplay
+    await false
+}
+
+;; [trace] of the test mode: as `TraceTitleScreen` of the original
+func b (x) { if x => 1 => 0 }
+func trace_system (s, n) {
+    var c, sx, sy, sr, sa = 0, 0, 0, 0, 0
+    loop i in n {
+        val p = s.ps@i
+        if p.active {
+            set c += 1
+            set sx, sy, sr, sa = sx + p.x, sy + p.y, sr + p.rot, sa + p.alpha
+        }
+    }
+    string.format(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", b(s.active), s.spawn, s.max, c, sx, sy, sr, sa)
+}
+func trace_rays (s) {
+    var c, sx, sa, ss, sd = 0, 0, 0, 0, 0
+    loop _,r in s.ps {
+        if r.active {
+            set c += 1
+            set sx, sa, ss, sd = sx + r.x, sa + r.alpha, ss + r.size, sd + (r.delay + (100 * b(r.fading)))
+        }
+    }
+    string.format(" %d:%d:%d:%d:%.3f:%.3f:%.3f:%.3f", b(s.active), s.spawn, s.max, c, sx, sa, ss, sd)
+}
+func title_trace () {
+    var s = string.format(" %d %d %d %d %.4f %.4f %d %d %d %d", T.frames, T.global, T.frame, T.this, T.value1, T.value2,
+        initSeason, rainChance, T.back_offset, T.front_offset)
+    loop _,k in [:snow, :back_snow, :planetree, :back_planetree, :dandelion, :dandelion_back, :flower, :back_flower, :rain, :back_rain] {
+        set s = s ++ trace_system(T@k, 128)
+    }
+    set s = s ++ trace_system(T.rain_storm, 1024) ++ trace_system(T.snow_storm, 256)
+    s ++ trace_rays(T.rays) ++ trace_rays(T.back_rays)
+}
+;; [/trace]

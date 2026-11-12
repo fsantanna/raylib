@@ -1,0 +1,4 @@
+# The title in its season by the seed: dandelions and light rays.
+FRAMES=700
+SEED=32
+SHOTS="300 600 700"

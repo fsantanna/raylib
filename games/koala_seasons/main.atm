@@ -1,0 +1,149 @@
+;; Koala Seasons, by Ramon Santamaria (@raysan5), Daniel Gomez, Daniel Moreno
+;; and Marc Aguera, credited in README.original.md. Copyright (c) 2014-2024
+;; Ramon Santamaria (@raysan5), zlib license. The art and sound are those
+;; of the original.
+;;
+;; Ported to Atmos: an altered version of `koala_seasons/src/*.c` of
+;; raysan5/raylib-games. The game is the same: the logo of raylib, the
+;; title, the gameplay, and the ending. The screens are tasks; the
+;; transition is the one of the C, which inits the next screen when it is
+;; asked, under the old one, which goes on being drawn (the ending loses
+;; its kills under the fade, as the gameplay resets them).
+
+include "../../raylib.atm"
+include "../screens.atm"
+include "atlas.atm"
+
+val W, H = 1280, 720
+val f32  = rl.f32
+
+func int (x) {                          ;; (int) of the C: towards zero
+    if x < 0 => math.ceil(x) => math.floor(x)
+}
+
+rl.window [title="KOALA SEASONS", width=W, height=H, fps=60]
+pin font   = rl.font("resources/graphics/mainfont.png")
+val SIZE   = rl.font_size(font)
+pin atlas1 = rl.texture("resources/graphics/atlas01.png")
+pin atlas2 = rl.texture("resources/graphics/atlas02.png")
+pin blend  = rl.shader(nil, "resources/shaders/glsl330/blend_color.fs")
+rl.audio_init()
+pin fx_jump   = rl.sound("resources/audio/jump.ogg")
+pin fx_dash   = rl.sound("resources/audio/dash.ogg")
+pin fx_eat    = rl.sound("resources/audio/eat_leaves.ogg")
+pin fx_resin  = rl.sound("resources/audio/resin_hit.ogg")
+pin fx_wind   = rl.sound("resources/audio/wind_sound.ogg")
+pin fx_snake  = rl.sound("resources/audio/snake_die.ogg")
+pin fx_dingo  = rl.sound("resources/audio/dingo_die.ogg")
+pin fx_owl    = rl.sound("resources/audio/owl_die.ogg")
+pin music     = rl.music("resources/audio/jngl.xm")
+rl.play_music(music)
+rl.music_volume(music, 2)
+
+;; The globals of the C, shared by the screens
+var score, hiscore, killer, seasons, years = 0, 0, 0, 0, 0
+var currentLeaves, currentSeason, initSeason, initYears, rainChance = 0, 0, 0, 0, 0
+val killHistory = []
+loop i in 128 { set killHistory@i = 0 }
+
+include "title.atm"
+include "gameplay.atm"
+include "ending.atm"
+
+;; ---------------------------------------------------------------------------
+;; The screens: 0 the logo, 1 the title, 3 the gameplay, 4 the ending, as the
+;; C numbers them. The logo changes to the title at once; the others ask a
+;; transition, which inits the next screen at once (`INITS`).
+
+var current, trans, alpha, to = 0, false, 0, -1
+task LogoScreen () {
+    pin l = spawn Logo(true, nil, nil)
+    await :rl.frame until l.pub
+    set pub = true
+    await false
+}
+val SCREENS = [[0, LogoScreen], [1, Title], [3, Gameplay], [4, Ending]]
+val NEXT    = [gameplay=3, ending=4]
+val INITS   = [[3, gameplay_init], [4, ending_init]]
+func screen_task (n) {
+    var t = nil
+    loop _,s in SCREENS { if s@0 == n { set t = s@1 } }
+    t
+}
+func screen_init (n) {
+    loop _,s in INITS { if s@0 == n { (s@1)() } }
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.WHITE)
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            var s = string.format("%d %d %d %.4f %d |", rl.frame(), current, if trans => 1 => 0, alpha, to)
+            if current == 1 { set s = s ++ title_trace() }
+            if current == 3 { set s = s ++ gameplay_trace() }
+            if current == 4 { set s = s ++ ending_trace() }
+            print(s)
+        }
+    }
+}
+;; [/trace]
+
+pin screens = spawn {
+    loop {
+        pin s = spawn (screen_task(current))()
+        spawn {
+            loop on :rl.draw {
+                if trans {
+                    rl.rectangle(0, 0, W, H, rl.fade(rl.BLACK, alpha))
+                }
+            }
+        }
+        if trans {
+            ;; the fade out, over the new screen, drawn but not updated
+            toggle s(false) with :rl.draw
+            loop {
+                await :rl.frame
+                set alpha = f32(alpha - f32(0.05))
+                until alpha <= 0
+            }
+            set alpha, trans, to = 0, false, -1
+            toggle s(true)
+        }
+        await :rl.frame until s.pub
+        if current == 0 {
+            set current = 1                 ;; ChangeToScreen(TITLE): at once
+        } else {
+            set to = NEXT@(s.pub)
+            screen_init(to)
+            set trans = true
+            ;; the fade in, over the old screen, drawn but not updated
+            toggle s(false) with :rl.draw
+            loop {
+                await :rl.frame
+                set alpha = f32(alpha + f32(0.05))
+                until alpha >= 1
+            }
+            set alpha, current = 1, to
+        }
+    }
+}
+
+spawn {
+    loop on :rl.frame {
+        rl.update_music(music)
+    }
+}
+;; the label of the C, over all
+spawn {
+    loop on :rl.draw {
+        rl.rectangle(W - 200, H - 50, 200, 40, rl.fade(rl.WHITE, 0.6))
+        rl.text("ALPHA VERSION", W - 180, H - 40, 20, rl.DARKGRAY)
+    }
+}
+await false

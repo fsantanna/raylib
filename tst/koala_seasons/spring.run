@@ -1,0 +1,4 @@
+# The title in its season by the seed: flowers.
+FRAMES=700
+SEED=2
+SHOTS="300 600 700"
