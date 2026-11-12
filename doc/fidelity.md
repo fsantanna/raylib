@@ -19,8 +19,8 @@ that is checked, and what differs, game by game.
       code), `mv:X:Y` (mouse), `md:B` and `mu:B` (mouse buttons), `wh:D`
       (wheel).
     - `RL_SHOT=f:file.png,...`: saves the screen at the end of frame `f`.
-  It also sends the log of raylib to stderr, so that stdout has the trace
-  only. `tst/rlt` checks the test mode.
+  It also sends the whole log of raylib to stderr (warnings included, such
+  as those of the audio with no device), so that stdout has the trace only. `tst/rlt` checks the test mode.
 - `tools/originals.sh` builds the 23 originals against it, with
   `tools/original.patch`, which adds a trace: a line per frame with the
   state that the game exposes. The patch grows game by game, as each game is

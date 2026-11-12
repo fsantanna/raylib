@@ -1,0 +1,134 @@
+;; What the games with screens share, as in their C: the logo of raylib,
+;; and the screens with a transition between them.
+;;
+;; From raysan5/raylib-games (zlib license): the shared parts of its games.
+;;
+;;      include "../screens.atm"
+;;      await Screens([logo=Logo, title=Title, ...], :logo)
+;;
+;; A screen is a task that updates in :rl.frame and draws in :rl.draw; when
+;; it is done, it sets its `pub` to the name of the next screen, and goes on
+;; being drawn while the screen fades to white. Then it is aborted (its
+;; resources go with it), and the next screen starts, still under the white,
+;; which fades in one frame (as the C does: `(int)transAlpha <= 0` holds as
+;; soon as the alpha leaves 1). A new screen updates from the second frame
+;; after it starts, as in the C.
+
+;; The logo of raylib: a blinking corner, two bars, two bars, the letters,
+;; "powered by", and a fade. `bars` is called when the first bars start.
+task Logo (bars) {
+    val x, y = (rl.width()//2) - 128, (rl.height()//2) - 128
+    var top, left, bottom, right = 16, 16, 16, 16
+    ;; the corner blinks: off in the frames 1..9, on in 10..19, and so on
+    par :any {
+        await rl.Frames(80)
+    } with {
+        await rl.Frames(10)
+        loop {
+            watching rl.Frames(10) {
+                loop on :rl.draw {
+                    rl.rectangle(x, y, 16, 16, rl.BLACK)
+                }
+            }
+            await rl.Frames(10)
+        }
+    }
+    if bars { bars() }
+    ;; the top and left bars, then the bottom and right ones
+    watching :rl.frame until (top == 256) {
+        par {
+            loop on :rl.frame {
+                set top, left = top + 8, left + 8
+            }
+        } with {
+            loop on :rl.draw {
+                rl.rectangle(x, y, top, 16, rl.BLACK)
+                rl.rectangle(x, y, 16, left, rl.BLACK)
+            }
+        }
+    }
+    watching :rl.frame until (bottom == 256) {
+        par {
+            loop on :rl.frame {
+                set bottom, right = bottom + 8, right + 8
+            }
+        } with {
+            loop on :rl.draw {
+                rl.rectangle(x, y, top, 16, rl.BLACK)
+                rl.rectangle(x, y, 16, left, rl.BLACK)
+                rl.rectangle(x + 240, y, 16, right, rl.BLACK)
+                rl.rectangle(x, y + 240, bottom, 16, rl.BLACK)
+            }
+        }
+    }
+    ;; the letters, one every 12 frames; "powered by" 21 frames after them;
+    ;; the fade 201 frames after them
+    var letters, alpha, powered = 0, 1, false
+    par :any {
+        loop _ in 10 {
+            await rl.Frames(12)
+            set letters += 1
+        }
+        par :any {
+            await rl.Frames(21)
+            set powered = true
+            await false
+        } with {
+            await rl.Frames(201)
+            loop {
+                set alpha = rl.f32(alpha - rl.f32(0.02))
+                if alpha <= 0 {
+                    set alpha = 0
+                    break
+                }
+                await :rl.frame
+            }
+        }
+    } with {
+        loop on :rl.draw {
+            rl.rectangle(x, y, top, 16, rl.fade(rl.BLACK, alpha))
+            rl.rectangle(x, y + 16, 16, left - 32, rl.fade(rl.BLACK, alpha))
+            rl.rectangle(x + 240, y + 16, 16, right - 32, rl.fade(rl.BLACK, alpha))
+            rl.rectangle(x, y + 240, bottom, 16, rl.fade(rl.BLACK, alpha))
+            rl.rectangle((rl.width()//2) - 112, (rl.height()//2) - 112, 224, 224, rl.fade(rl.RAYWHITE, alpha))
+            rl.text(string.sub("raylib", 0, letters - 1), (rl.width()//2) - 44, (rl.height()//2) + 48, 50, rl.fade(rl.BLACK, alpha))
+            if powered {
+                rl.text("powered by", x, y - 27, 20, rl.fade(rl.DARKGRAY, alpha))
+            }
+        }
+    }
+}
+
+;; The screens, by name, from the first one.
+task Screens (screens, first) {
+    var name = first
+    var fresh = false
+    loop {
+        pin s = spawn (screens@name)()
+        if fresh {
+            ;; under the white, for this frame; it updates from the second one
+            spawn {
+                await :rl.draw
+                rl.rectangle(0, 0, rl.width(), rl.height(), rl.fade(rl.RAYWHITE, 1))
+            }
+            toggle s(false) with :rl.draw
+            await :rl.frame
+            toggle s(true)
+        }
+        await :rl.frame until s.pub
+        ;; to white, over the screen, which is drawn but no more updated
+        toggle s(false) with :rl.draw
+        var alpha = 0
+        spawn {
+            loop on :rl.draw {
+                rl.rectangle(0, 0, rl.width(), rl.height(), rl.fade(rl.RAYWHITE, alpha))
+            }
+        }
+        loop {
+            await :rl.frame
+            set alpha = rl.f32(alpha + rl.f32(0.05))
+            until math.floor(alpha) >= 1
+        }
+        set name, fresh = s.pub, true
+    }
+}

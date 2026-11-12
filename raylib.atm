@@ -217,6 +217,44 @@ static const char* rl_s (AVal s) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// RESOURCES: textures, render textures, fonts, sounds, music, as natives
+///////////////////////////////////////////////////////////////////////////////
+
+static const char* RL_KIND_TEX = "rl.texture";
+static const char* RL_KIND_RTX = "rl.render";
+static const char* RL_KIND_FNT = "rl.font";
+static const char* RL_KIND_SND = "rl.sound";
+static const char* RL_KIND_MUS = "rl.music";
+
+static void rl_tex_fin (void* p) { UnloadTexture(*(Texture2D*)p); free(p); }
+static void rl_rtx_fin (void* p) { UnloadRenderTexture(*(RenderTexture2D*)p); free(p); }
+static void rl_fnt_fin (void* p) { UnloadFont(*(Font*)p); free(p); }
+static void rl_snd_fin (void* p) { UnloadSound(*(Sound*)p); free(p); }
+static void rl_mus_fin (void* p) { UnloadMusicStream(*(Music*)p); free(p); }
+
+static AVal rl_box (const void* v, size_t n, void (*fin)(void*), const char* kind) {
+    void* p = malloc(n);
+    memcpy(p, v, n);
+    return a_nat(p, fin, kind);
+}
+
+// The texture of a texture or of a render texture.
+static Texture2D rl_texture (AVal t) {
+    if (a_nat_is(t, RL_KIND_TEX) && a_nat_ptr(t) != NULL) return *(Texture2D*)a_nat_ptr(t);
+    if (a_nat_is(t, RL_KIND_RTX) && a_nat_ptr(t) != NULL) return ((RenderTexture2D*)a_nat_ptr(t))->texture;
+    return (Texture2D){ 0 };
+}
+static Font rl_font (AVal f) {
+    return (a_nat_is(f, RL_KIND_FNT) && a_nat_ptr(f) != NULL) ? *(Font*)a_nat_ptr(f) : GetFontDefault();
+}
+static Sound* rl_sound (AVal s) {
+    return (a_nat_is(s, RL_KIND_SND) && a_nat_ptr(s) != NULL) ? (Sound*)a_nat_ptr(s) : NULL;
+}
+static Music* rl_music (AVal m) {
+    return (a_nat_is(m, RL_KIND_MUS) && a_nat_ptr(m) != NULL) ? (Music*)a_nat_ptr(m) : NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DRIVER
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -479,6 +517,78 @@ val rl = [
     },
     check_collision_point_rec = func (px, py, x, y, w, h) {
         `:boolean CheckCollisionPointRec((Vector2){RL_F($px),RL_F($py)}, (Rectangle){RL_F($x),RL_F($y),RL_F($w),RL_F($h)})`
+    },
+
+    ;; Resources: native values, released with their `pin` (or their last
+    ;; reference). Textures and fonts need the window.
+    texture = func (path) {
+        `Texture2D rl_t = LoadTexture(rl_s($path));`
+        `:value rl_box(&rl_t, sizeof(rl_t), rl_tex_fin, RL_KIND_TEX)`
+    },
+    render_texture = func (w, h) {
+        `RenderTexture2D rl_r = LoadRenderTexture(RL_I($w), RL_I($h));`
+        `:value rl_box(&rl_r, sizeof(rl_r), rl_rtx_fin, RL_KIND_RTX)`
+    },
+    texture_width  = func (t) { `:number rl_texture($t).width` },
+    texture_height = func (t) { `:number rl_texture($t).height` },
+    texture_id     = func (t) { `:number rl_texture($t).id` },
+    font = func (path) {
+        `Font rl_f = LoadFont(rl_s($path));`
+        `:value rl_box(&rl_f, sizeof(rl_f), rl_fnt_fin, RL_KIND_FNT)`
+    },
+    font_size = func (f) { `:number rl_font($f).baseSize` },
+
+    ;; Audio: with no device, sounds and music do nothing, as in raylib.
+    audio_init  = func () { `InitAudioDevice();` },
+    audio_close = func () { `CloseAudioDevice();` },
+    sound = func (path) {
+        `Sound rl_snd = LoadSound(rl_s($path));`
+        `:value rl_box(&rl_snd, sizeof(rl_snd), rl_snd_fin, RL_KIND_SND)`
+    },
+    play_sound   = func (s) { `if (rl_sound($s)) PlaySound(*rl_sound($s));` },
+    sound_volume = func (s, v) { `if (rl_sound($s)) SetSoundVolume(*rl_sound($s), RL_F($v));` },
+    sound_pitch  = func (s, v) { `if (rl_sound($s)) SetSoundPitch(*rl_sound($s), RL_F($v));` },
+    music = func (path) {
+        `Music rl_m = LoadMusicStream(rl_s($path));`
+        `:value rl_box(&rl_m, sizeof(rl_m), rl_mus_fin, RL_KIND_MUS)`
+    },
+    play_music   = func (m) { `if (rl_music($m)) PlayMusicStream(*rl_music($m));` },
+    stop_music   = func (m) { `if (rl_music($m)) StopMusicStream(*rl_music($m));` },
+    pause_music  = func (m) { `if (rl_music($m)) PauseMusicStream(*rl_music($m));` },
+    resume_music = func (m) { `if (rl_music($m)) ResumeMusicStream(*rl_music($m));` },
+    update_music = func (m) { `if (rl_music($m)) UpdateMusicStream(*rl_music($m));` },
+    music_volume = func (m, v) { `if (rl_music($m)) SetMusicVolume(*rl_music($m), RL_F($v));` },
+    music_pitch  = func (m, v) { `if (rl_music($m)) SetMusicPitch(*rl_music($m), RL_F($v));` },
+
+    ;; Drawing of textures and text with a font
+    draw_texture = func (t, x, y, c) {
+        `DrawTexture(rl_texture($t), RL_I($x), RL_I($y), rl_color($c));`
+    },
+    draw_texture_v = func (t, x, y, c) {
+        `DrawTextureV(rl_texture($t), (Vector2){RL_F($x),RL_F($y)}, rl_color($c));`
+    },
+    draw_texture_ex = func (t, x, y, rot, scale, c) {
+        `DrawTextureEx(rl_texture($t), (Vector2){RL_F($x),RL_F($y)}, RL_F($rot), RL_F($scale), rl_color($c));`
+    },
+    draw_texture_rec = func (t, sx, sy, sw, sh, x, y, c) {
+        `DrawTextureRec(rl_texture($t), (Rectangle){RL_F($sx),RL_F($sy),RL_F($sw),RL_F($sh)}, (Vector2){RL_F($x),RL_F($y)}, rl_color($c));`
+    },
+    draw_texture_pro = func (t, sx, sy, sw, sh, dx, dy, dw, dh, ox, oy, rot, c) {
+        `DrawTexturePro(rl_texture($t), (Rectangle){RL_F($sx),RL_F($sy),RL_F($sw),RL_F($sh)}, (Rectangle){RL_F($dx),RL_F($dy),RL_F($dw),RL_F($dh)}, (Vector2){RL_F($ox),RL_F($oy)}, RL_F($rot), rl_color($c));`
+    },
+    begin_texture_mode = func (r) {
+        `if (a_nat_is($r, RL_KIND_RTX)) BeginTextureMode(*(RenderTexture2D*)a_nat_ptr($r));`
+    },
+    end_texture_mode = func () { `EndTextureMode();` },
+    text_ex = func (f, s, x, y, size, spacing, c) {
+        `DrawTextEx(rl_font($f), rl_s($s), (Vector2){RL_F($x),RL_F($y)}, RL_F($size), RL_F($spacing), rl_color($c));`
+    },
+    measure_ex = func (f, s, size, spacing) {
+        `Vector2 rl_m = MeasureTextEx(rl_font($f), rl_s($s), RL_F($size), RL_F($spacing));`
+        return `:number rl_m.x`, `:number rl_m.y`
+    },
+    line_ex = func (x1, y1, x2, y2, thick, c) {
+        `DrawLineEx((Vector2){RL_F($x1),RL_F($y1)}, (Vector2){RL_F($x2),RL_F($y2)}, RL_F($thick), rl_color($c));`
     },
 
     ;; rl.KEY.RIGHT: the codes of the keys
