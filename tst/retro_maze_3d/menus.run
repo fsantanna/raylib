@@ -1,0 +1,8 @@
+# The menus: CREDITS from the title, ENTER back (the title comes down
+# again), START GAME before the 3D shows up, the pause, BACK TO TITLE (the
+# title goes on from where it was), ENTER again: the CREDITS, as the option
+# is shared by the two menus and the pause left it there.
+FRAMES=1500
+SEED=1
+INPUT=330:dn:DOWN,331:up:DOWN,340:dn:ENTER,341:up:ENTER,700:dn:ENTER,701:up:ENTER,760:dn:UP,761:up:UP,770:dn:ENTER,771:up:ENTER,800:dn:W,860:up:W,880:dn:SPACE,881:up:SPACE,900:dn:DOWN,901:up:DOWN,920:dn:ENTER,921:up:ENTER,1300:dn:ENTER,1301:up:ENTER,1310:dn:W,1400:up:W
+SHOTS="340 400 600 700 701 760 770 771 860 880 900 920 921 1000 1100 1200 1300 1301 1400 1500"
