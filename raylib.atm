@@ -37,6 +37,7 @@
 #include <string.h>
 #include "raylib.h"
 #include "raymath.h"
+#include "reasings.h"          // examples/shapes of raylib: -I<raylib>/examples/shapes
 
 int RltFrame (void) __attribute__((weak));
 
@@ -553,6 +554,10 @@ val rl = [
         `Font rl_f = LoadFont(rl_s($path));`
         `:value rl_box(&rl_f, sizeof(rl_f), rl_fnt_fin, RL_KIND_FNT)`
     },
+    font_ex = func (path, size) {
+        `Font rl_f = LoadFontEx(rl_s($path), RL_I($size), NULL, 0);`
+        `:value rl_box(&rl_f, sizeof(rl_f), rl_fnt_fin, RL_KIND_FNT)`
+    },
     font_size = func (f) { `:number rl_font($f).baseSize` },
 
     ;; Audio: with no device, sounds and music do nothing, as in raylib.
@@ -616,6 +621,37 @@ val rl = [
     line_ex = func (x1, y1, x2, y2, thick, c) {
         `DrawLineEx((Vector2){RL_F($x1),RL_F($y1)}, (Vector2){RL_F($x2),RL_F($y2)}, RL_F($thick), rl_color($c));`
     },
+
+    ;; Easings of reasings.h (t, b, c, d): the value at time t of d, from b to
+    ;; b+c, on floats of 32 bits, as in raylib: rl.ease_quad_in(t, 0, 1, 1)
+    ease_linear_none = func (t, b, c, d) { `:number.float EaseLinearNone(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_linear_in = func (t, b, c, d) { `:number.float EaseLinearIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_linear_out = func (t, b, c, d) { `:number.float EaseLinearOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_linear_in_out = func (t, b, c, d) { `:number.float EaseLinearInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_sine_in = func (t, b, c, d) { `:number.float EaseSineIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_sine_out = func (t, b, c, d) { `:number.float EaseSineOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_sine_in_out = func (t, b, c, d) { `:number.float EaseSineInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_circ_in = func (t, b, c, d) { `:number.float EaseCircIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_circ_out = func (t, b, c, d) { `:number.float EaseCircOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_circ_in_out = func (t, b, c, d) { `:number.float EaseCircInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_cubic_in = func (t, b, c, d) { `:number.float EaseCubicIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_cubic_out = func (t, b, c, d) { `:number.float EaseCubicOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_cubic_in_out = func (t, b, c, d) { `:number.float EaseCubicInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_quad_in = func (t, b, c, d) { `:number.float EaseQuadIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_quad_out = func (t, b, c, d) { `:number.float EaseQuadOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_quad_in_out = func (t, b, c, d) { `:number.float EaseQuadInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_expo_in = func (t, b, c, d) { `:number.float EaseExpoIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_expo_out = func (t, b, c, d) { `:number.float EaseExpoOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_expo_in_out = func (t, b, c, d) { `:number.float EaseExpoInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_back_in = func (t, b, c, d) { `:number.float EaseBackIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_back_out = func (t, b, c, d) { `:number.float EaseBackOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_back_in_out = func (t, b, c, d) { `:number.float EaseBackInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_bounce_out = func (t, b, c, d) { `:number.float EaseBounceOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_bounce_in = func (t, b, c, d) { `:number.float EaseBounceIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_bounce_in_out = func (t, b, c, d) { `:number.float EaseBounceInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_elastic_in = func (t, b, c, d) { `:number.float EaseElasticIn(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_elastic_out = func (t, b, c, d) { `:number.float EaseElasticOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
+    ease_elastic_in_out = func (t, b, c, d) { `:number.float EaseElasticInOut(RL_F($t), RL_F($b), RL_F($c), RL_F($d))` },
 
     ;; rl.KEY.RIGHT: the codes of the keys
     KEY = [
