@@ -576,3 +576,33 @@ index 30aac25..c45592b 100644
      //----------------------------------------------------------------------------------
  
      // Draw
+diff --git a/drturtle/src/06_drturtle_final.c b/drturtle/src/06_drturtle_final.c
+index 447ea61..da79538 100644
+--- a/drturtle/src/06_drturtle_final.c
++++ b/drturtle/src/06_drturtle_final.c
+@@ -11,6 +11,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <math.h>        // Used for sinf()
+ 
+ #define MAX_ENEMIES 10
+@@ -339,6 +342,15 @@ int main()
+ 
+         // Draw
+         //----------------------------------------------------------------------------------
++        // Atmos port: trace, one line per frame, after its logic
++        if (RltFrame() > 0)
++        {
++            printf("%d %d %d %d %.1f %d %d %.4f %d %d %d", RltFrame(), currentScreen, playerRail, score, distance,
++                foodBar, gameraMode, enemySpeed, seaScrolling, backScrolling, blue);
++            for (int i = 0; i < MAX_ENEMIES; i++) if (enemyActive[i]) printf(" %d:%d:%d:%.4f", i, enemyType[i], enemyRail[i], enemyBounds[i].x);
++            printf(" | %d %.1f\n", hiscore, hidistance);
++        }
++
+         BeginDrawing();
+ 
+             ClearBackground(RAYWHITE);

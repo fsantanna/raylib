@@ -1,0 +1,6 @@
+# The title for 100 frames (the text blinks); ENTER; the turtle stays on
+# its rail until an enemy takes it; the end, and ENTER again.
+FRAMES=700
+SEED=1
+INPUT=100:dn:ENTER,101:up:ENTER,600:dn:ENTER,601:up:ENTER
+SHOTS="1 29 30 60 100 101 150 300"
