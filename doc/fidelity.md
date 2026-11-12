@@ -51,3 +51,31 @@ that is checked, and what differs, game by game.
   `00_drturtle_screens.c` to `06_drturtle_final.c`, as a tutorial, plus a
   version for the web. The target is the final one (485 lines), not the
   1792 lines of the seven files.
+
+## snake
+
+Same as the original on its runs `play` (760 frames, 12 screens: six fruits,
+a pause, a wall, an ENTER in the frame of the game over, two restarts) and
+`self` (460 frames, 4 screens: the snake runs into itself).
+
+Trace: frame, phase, length, head, fruit.
+
+What the port keeps on purpose, since the screens would differ otherwise:
+
+- In the frame the snake eats, the C draws the eaten fruit over the head
+  (`fruit.active` is false, but it is drawn anyway). The port draws the
+  fruit where it was until the next one is placed, in the next frame.
+- In the frame of ENTER after a game over, the C only calls `InitGame`, and
+  draws the new snake with the fruit of the last game. The port starts the
+  next game after the logic of that frame, and keeps `fruit` outside the
+  game, as the C does.
+- A new fruit is placed in the frame after the move, after the check of the
+  walls; the eaten one is checked when the snake moves. In the first frame
+  of a game the C places the fruit before it checks eating: the port checks
+  eating only once its fruit is placed.
+
+What can differ, and no run does:
+
+- Two keys pressed in the same frame. The C reads `P` first, then the
+  arrows in a fixed order (RIGHT, LEFT, UP, DOWN). The port handles the key
+  events in the order raylib gives them (`GetKeyPressed`).

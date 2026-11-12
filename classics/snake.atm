@@ -141,7 +141,7 @@ spawn {
     }
 }
 
-;; the trace of the test mode: one line per frame, after its logic
+;; [trace] of the test mode: one line per frame, after its logic
 spawn {
     if rl.frame() > 0 {
         loop on :rl.draw {
@@ -151,6 +151,7 @@ spawn {
         }
     }
 }
+;; [/trace]
 
 loop {
     await Game()
