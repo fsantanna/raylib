@@ -544,3 +544,44 @@ the current level (positions, flags, colors, the time of done).
   frames before its first letter (`string.sub` with a length of 0); this
   port found it, and it now uses `TextSubtext`, as the C. No stored run of
   the earlier games has a screen in those frames.
+
+## skully_escape
+
+Same as the original on its runs `start` (1500 frames, 27 screens: the two
+logos, the title, the message of the attic through its four phases),
+`play` (6479 frames, 24 screens: the escape) and `death` (3535 frames, 9
+screens). `play` and `death` are made by `tst/skully_escape/gen.py`, which
+simulates the game (the player, the rooms, the searches, the doors, the
+transitions, the death) to plan the keys; the original went where the
+plan expected: through the attic, the first aisle, the bathroom, the
+first aisle again, the living room, the second aisle, the kitchen, the
+armory, the ending and the title; and, in `death`, four scares and the
+title.
+
+Trace: frame, screen, transition and its alpha; the player (position,
+sequence, frame, key, lives, death); the alpha of the title or of the
+ending; in a room, the phase of the message and its counters, the frames
+of the search and of the letters, the search, the monster checked, the
+hover, each door (locked, selected), each monster (found, selected,
+frame), and the scroll of the aisles.
+
+- **One room, seven tables.** The rooms differ only in their data and in
+  the orders the C uses: the doors are checked in one order and drawn in
+  another, the monsters are searched, drawn and shown with "CHOOSE
+  WISELY!" in orders of their own, and the kitchen leaves its chair out of
+  the hover text. The tables keep each order.
+- **A search goes on through a door.** The second SPACE that goes through
+  the left door of the first aisle also searches the lamp beside it; the
+  flag of the search, never reset, is still on when the player comes back
+  to the aisle, where the search ends with no monster (the run `play` does
+  it).
+- **One counter for two things.** In a room, the frames of a search
+  (counted twice per frame) and of the typed letters are the same counter;
+  the port keeps it shared.
+- **The bounds of the player** are those of the last room until the
+  player moves (the C updates them in its update only).
+- **The death counts out of the transitions** in the C; the port counts
+  80 frames from the death. Both are the same unless a door is taken in
+  those 80 frames, when the scared player cannot move: no run does it.
+- The logo of the team waits until the frames counted since the last
+  letter of raylib reach 360, as the C counts them.
