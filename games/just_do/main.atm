@@ -1,0 +1,667 @@
+;; JUST DO (GGJ15), by Ramon Santamaria (@raysan5), credited in
+;; README.original.md. Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib
+;; license. The sound is that of the original.
+;;
+;; Ported to Atmos: an altered version of `just_do/src/*.c` of
+;; raysan5/raylib-games. The game is the same: the logo and ten levels,
+;; each a puzzle. What every level shares (play until done, the time, the
+;; wait, the click to go on: `done`, `levelFinished`, `finishScreen` and a
+;; counter of frames in the C) is the task `Level`; the logo is the one of
+;; `screens.atm`. The transition is that of the C, with the keys 0 to 9
+;; that jump to a level. What a level keeps is as in the C: its statics
+;; live in a table, which its `init` resets in part, and which a second
+;; visit finds as the first one left it (a level done stays done).
+
+include "../../raylib.atm"
+include "../screens.atm"
+
+val W, H = 1280, 720
+val f32  = rl.f32
+
+rl.window [title="JUST DO [GGJ15]", width=W, height=H, fps=60]
+rl.audio_init()
+pin win   = rl.sound("resources/win.wav")
+pin music = rl.music("resources/ambient.ogg")
+
+func in_rec (x, y, r) {
+    rl.check_collision_point_rec(x, y, r.x, r.y, r.w, r.h)
+}
+func in_circle (x, y, cx, cy, r) {
+    rl.check_collision_point_circle(x, y, cx, cy, r)
+}
+func rect (r, c) {
+    rl.rectangle_v(r.x, r.y, r.w, r.h, c)
+}
+func mx () { rl.mouse_x() }
+func my () { rl.mouse_y() }
+func pressed () { rl.mouse_pressed(0) }
+
+;; ---------------------------------------------------------------------------
+;; The levels: their statics (as the C initializes them), `init` (as the
+;; C's InitLevelXX), `update` (what the C does while not done; it sets
+;; `done`), and `draw` (what is drawn under the frame of a level done).
+;; Each update returns where the C returns.
+
+;; 00: J_ST D_, with an U that falls and an O that goes down by clicks
+val L00 = [over_u=false, over_o=false, placed_u=false, placed_o=false]
+func init00 () {
+    set L00.u = [x=(W//2) - 265, y=-200, w=rl.measure("U", 160) + 40, h=160]
+    set L00.o = [x=W - 370, y=-30, w=rl.measure("O", 160) + 40, h=160]
+}
+func update00 () {
+    val L, u, o = L00, L00.u, L00.o
+    if !L.placed_u { set u.y += 2 }
+    if u.y >= H { set u.y = -u.h }
+    if in_rec(mx(), my(), u) {
+        set L.over_u = true
+        if !L.placed_u && pressed() {
+            if (u.y > ((H//2) - 110)) && ((u.y + u.h) < ((H//2) + 100)) {
+                set L.placed_u = true
+            }
+        }
+    } else {
+        set L.over_u = false
+    }
+    if in_rec(mx(), my(), o) {
+        set L.over_o = true
+        if !L.placed_o && pressed() { set o.y += 100 }
+        if o.y >= ((H//2) - 130) { set L.placed_o = true }
+    } else {
+        set L.over_o = false
+    }
+    if L.placed_o && L.placed_u { set L.done = true }
+}
+func draw00 () {
+    val L, u, o = L00, L00.u, L00.o
+    val jx = (W//2) - (rl.measure("JUST DO", 160)//2)
+    rl.text("U", u.x, u.y + 10, 160, rl.GRAY)
+    rl.text("J", jx, (H//2) - 80, 160, rl.GRAY)
+    rl.text("ST D", jx + 210, (H//2) - 80, 160, rl.GRAY)
+    rl.text("O", o.x, o.y + 10, 160, rl.GRAY)
+    rl.text("by RAMON SANTAMARIA (@raysan5)", 370, (H//2) + 100, 30, rl.fade(rl.LIGHTGRAY, 0.4))
+    if L.over_u && !L.placed_u {
+        rl.rectangle_lines(u.x - 20, u.y, u.w, u.h, rl.fade(rl.LIGHTGRAY, 0.8))
+    }
+    if L.over_o && !L.placed_o {
+        rl.rectangle_lines(o.x - 20, o.y, o.w, o.h, rl.fade(rl.LIGHTGRAY, 0.8))
+    }
+}
+
+;; 01: two squares; a click on one shrinks the other, beside it grows it
+val L01 = []
+func init01 () {
+    set L01.out_l = [x=0, y=0, w=W//2, h=H]
+    set L01.out_r = [x=W//2, y=0, w=W//2, h=H]
+    set L01.in_l  = [x=(W//4) - 200, y=(H//2) - 200, w=400, h=400]
+    set L01.in_r  = [x=(W//2) + (W//4) - 200, y=(H//2) - 200, w=400, h=400]
+}
+func grow (r, d) {
+    set r.x, r.y, r.w, r.h = r.x - d, r.y - d, r.w + (2 * d), r.h + (2 * d)
+}
+func update01 () {
+    val L = L01
+    if pressed() {
+        if in_rec(mx(), my(), L.in_l) {
+            if L.in_r.w > 0 { grow(L.in_r, -20) }
+        } else {
+            if in_rec(mx(), my(), L.in_r) {
+                if L.in_l.w > 0 { grow(L.in_l, -20) }
+            } else {
+                if in_rec(mx(), my(), L.out_l) {
+                    grow(L.in_l, 20)
+                } else {
+                    if in_rec(mx(), my(), L.out_r) { grow(L.in_r, 20) }
+                }
+            }
+        }
+    }
+    if ((L.in_r.w == 0) && (L.in_l.h >= H)) || ((L.in_l.w == 0) && (L.in_r.h >= H)) {
+        set L.done = true
+    }
+}
+func draw01 () {
+    val L = L01
+    if L.done {
+        rl.rectangle(60, 60, W - 120, H - 120, rl.LIGHTGRAY)
+    } else {
+        rl.rectangle(0, 0, W, H, rl.LIGHTGRAY)
+    }
+    rect(L.out_l, rl.GRAY)
+    rect(L.in_l, rl.RAYWHITE)
+    rect(L.out_r, rl.RAYWHITE)
+    rect(L.in_r, rl.GRAY)
+}
+
+;; 02: a ball that flees the mouse, and a hole to drag under it
+val L02 = []
+func init02 () {
+    set L02.x, L02.y, L02.vx, L02.vy = 120, 80, 6, 8
+    set L02.hx, L02.hy = W//2, H//2
+}
+func update02 () {
+    val L = L02
+    set L.x, L.y = f32(L.x + L.vx), f32(L.y + L.vy)
+    if ((L.x - 40) <= 0) || ((L.x + 40) >= W) { set L.vx = -L.vx }
+    if ((L.y - 40) <= 0) || ((L.y + 40) >= H) { set L.vy = -L.vy }
+    val x, y = mx(), my()
+    if in_circle(x, y, L.x, L.y, 120) {
+        set L.x = rl.random(80, 1200)
+        set L.y = rl.random(80, 650)
+    }
+    if in_circle(x, y, L.hx, L.hy, 120) && rl.mouse_down(0) {
+        set L.hx, L.hy = x, y
+        if (L.hx - 50) <= 0 {
+            set L.hx = 50
+        } else {
+            if (L.hx + 50) >= W { set L.hx = W - 50 }
+        }
+        if (L.hy - 50) <= 0 {
+            set L.hy = 50
+        } else {
+            if (L.hy + 50) >= H { set L.hy = H - 50 }
+        }
+    }
+    val dx, dy = f32(L.x - L.hx), f32(L.y - L.hy)
+    if f32(math.sqrt(f32(f32(dx * dx) + f32(dy * dy)))) < 20 {
+        set L.done = true
+    }
+}
+func draw02 () {
+    val L = L02
+    rl.circle_v(L.hx, L.hy, 50, rl.LIGHTGRAY)
+    rl.circle_v(L.x, L.y, 40, rl.DARKGRAY)
+    rl.circle_lines(L.x, L.y, 120, rl.fade(rl.LIGHTGRAY, 0.8))
+}
+
+;; 03: a piece to drag into its hole, which shows it only from outside
+val L03 = [show=false, selected=false]
+func init03 () {
+    set L03.hole  = [x=(W//2) - 50, y=(H//2) - 50, w=100, h=100]
+    set L03.piece = [x=200, y=400, w=100, h=100]
+}
+func update03 () {
+    val L = L03
+    val x, y = mx(), my()
+    set L.show = in_rec(x, y, L.hole)
+    if rl.mouse_down(0) && in_rec(x, y, L.piece) {
+        set L.selected = true
+        set L.piece.x = math.floor(x) - 50
+        set L.piece.y = math.floor(y) - 50
+    }
+    if (L.piece.x == L.hole.x) && !in_rec(x, y, L.hole) {
+        set L.done = true
+    }
+}
+func draw03 () {
+    val L = L03
+    rect(L.hole, rl.GRAY)
+    rect(L.piece, rl.RAYWHITE)
+    if L.show {
+        rl.rectangle_lines(L.piece.x, L.piece.y, L.piece.w, L.piece.h, rl.fade(rl.LIGHTGRAY, 0.8))
+    }
+}
+
+;; 04: an inner circle to grow past the outer one (never reset)
+val L04 = [inner=40, outer=300]
+func init04 () {
+    set L04.cx, L04.cy = W//2, H//2
+}
+func update04 () {
+    val L = L04
+    if rl.mouse_down(0) {
+        if in_circle(mx(), my(), L.cx, L.cy, L.inner) {
+            set L.inner += 2
+        } else {
+            if in_circle(mx(), my(), L.cx, L.cy, L.outer) {
+                set L.outer += 2
+            } else {
+                set L.outer -= 2
+                if L.outer <= 260 { set L.outer = 260 }
+            }
+        }
+    } else {
+        set L.inner -= 2
+        if L.outer > 300 { set L.outer -= 2 }
+    }
+    if L.inner >= 270 {
+        set L.inner = 270
+    } else {
+        if L.inner <= 40 { set L.inner = 40 }
+    }
+    if L.outer >= 600 { set L.outer = 600 }
+    if L.inner >= L.outer { set L.done = true }
+}
+func draw04 () {
+    val L = L04
+    rl.circle_v(L.cx, L.cy, L.outer, rl.GRAY)
+    rl.circle_v(L.cx, L.cy, L.inner, rl.RAYWHITE)
+}
+
+;; 05: ten rings; a click on some rings turns another one
+val L05 = [radius=[], color=[]]
+val L05_TURNS = [8, 1, 5, 6, 4, 5, 6, 7, 8, 9]  ;; the ring that a click on ring i turns
+func init05 () {
+    set L05.cx, L05.cy = W//2, H//2
+    loop i in 10 {
+        set L05.radius@i = (760//10) * (10 - i)
+    }
+    val G, Wh = rl.GRAY, rl.RAYWHITE
+    set L05.color = [G, Wh, G, G, G, Wh, G, Wh, Wh, G]
+}
+func turn (cs, i) {
+    set cs@i = if cs@i == rl.GRAY => rl.RAYWHITE => rl.GRAY
+}
+func update05 () {
+    val L = L05
+    var hit = nil
+    if pressed() {
+        loop j in 10 {
+            val i = 9 - j
+            if (hit == nil) && in_circle(mx(), my(), L.cx, L.cy, L.radius@i) {
+                set hit = i
+            }
+        }
+    }
+    if hit != nil {
+        turn(L.color, L05_TURNS@hit)            ;; and the C returns
+    } else {
+        var all = true
+        loop _,c in L.color {
+            if c == rl.RAYWHITE { set all = false }
+        }
+        set L.done = all
+    }
+}
+func draw05 () {
+    val L = L05
+    loop i in 10 {
+        rl.poly(L.cx, L.cy, 64, L.radius@i, 0, L.color@i)
+    }
+}
+
+;; 06: four blocks that move; a click on one stops or starts another
+val L06 = [over=-1, recs=[], stopped=[], speed=[]]
+val L06_STOPS = [3, 2, 0, 1]            ;; the block that a click on block i stops
+func init06 () {
+    set L06.center = [x=(W//2) - 100, y=0, w=200, h=H]
+    loop i in 4 {
+        set L06.recs@i = [x=rl.random(0, 5) * 150, y=(i * 150) + 90, w=100, h=100]
+        set L06.stopped@i = false
+        set L06.speed@i = rl.random(4, 8)
+    }
+}
+func update06 () {
+    val L = L06
+    loop i in 4 {
+        val r = L.recs@i
+        if !(L.stopped@i) { set r.x += L.speed@i }
+        if r.x >= W { set r.x = -r.w }
+        if in_rec(mx(), my(), r) {
+            set L.over = i
+            if pressed() {
+                val j = L06_STOPS@i
+                set L.stopped@j = !(L.stopped@j)
+            }
+        }
+    }
+    var all = true
+    loop _,r in L.recs {
+        if !((r.x > L.center.x) && ((r.x + r.w) < (L.center.x + L.center.w))) {
+            set all = false
+        }
+    }
+    if all { set L.done = true }
+}
+func draw06 () {
+    val L = L06
+    rect(L.center, rl.LIGHTGRAY)
+    loop _,r in L.recs {
+        rect(r, rl.GRAY)
+    }
+    if !L.done && (L.over >= 0) {
+        val r = L.recs@(L.over)
+        rl.rectangle_lines(r.x - 5, r.y - 5, r.w + 10, r.h + 10, rl.fade(rl.LIGHTGRAY, 0.8))
+    }
+}
+
+;; 07: three circles and their buttons, which enable the clicks on them
+val L07 = []
+func init07 () {
+    set L07.cx = [(W//2) - 340, W//2, (W//2) + 340]
+    set L07.cy, L07.by = (H//2) - 100, (H//2) + 120
+    set L07.active = [false, true, false]
+    set L07.color = [rl.GRAY, rl.GRAY, rl.GRAY]
+}
+func flip (cs, i) {
+    set cs@i = if cs@i == rl.GRAY => rl.LIGHTGRAY => rl.GRAY
+}
+func update07 () {
+    val L = L07
+    val a = L.active
+    if pressed() {
+        val x, y = mx(), my()
+        if in_circle(x, y, L.cx@0, L.by, 80) {
+            set a@0 = !(a@0)
+        } else {
+            if in_circle(x, y, L.cx@1, L.by, 80) {
+                set a@1 = !(a@1)
+            } else {
+                if in_circle(x, y, L.cx@2, L.by, 80) { set a@2 = !(a@2) }
+            }
+        }
+        if (a@2) && in_circle(x, y, L.cx@0, L.cy, 100) { flip(L.color, 0) }
+        if (a@1) && in_circle(x, y, L.cx@1, L.cy, 100) { flip(L.color, 1) }
+        if (a@2) && (a@0) && in_circle(x, y, L.cx@2, L.cy, 100) { flip(L.color, 2) }
+    }
+    val c = L.color
+    if (c@0 == rl.LIGHTGRAY) && (c@1 == rl.LIGHTGRAY) && (c@2 == rl.LIGHTGRAY) && !(a@0) && !(a@1) && !(a@2) {
+        set L.done = true
+    }
+}
+func draw07 () {
+    val L = L07
+    loop i in 3 {
+        rl.circle_v(L.cx@i, L.cy, 100, L.color@i)
+    }
+    loop i in 3 {
+        rl.circle_v(L.cx@i, L.by, 80, if L.active@i => rl.GRAY => rl.LIGHTGRAY)
+    }
+}
+
+;; 08: a box that bounces between columns; a click on one moves the gap
+val L08 = [speed=4]                     ;; never reset
+func init08 () {
+    set L08.box = [x=20, y=(H//2) - 20, w=40, h=40]
+    set L08.cols = [
+        [x=240, y=0, w=100, h=H],
+        [x=(W//2) - 50, y=0, w=100, h=H],
+        [x=920, y=0, w=100, h=H],
+    ]
+    set L08.active = [true, false, true]
+}
+func update08 () {
+    val L, b, a = L08, L08.box, L08.active
+    set b.x += L.speed
+    if b.x <= 0 { set L.speed = -L.speed }
+    var hit = false
+    loop i in 3 {
+        val c = L.cols@i
+        if (a@i) && rl.check_collision_recs(c.x, c.y, c.w, c.h, b.x, b.y, b.w, b.h) { set hit = true }
+    }
+    if hit { set L.speed = -L.speed }
+    if pressed() {
+        if in_rec(mx(), my(), L.cols@0) {
+            set a@1, a@2 = false, true
+        } else {
+            if in_rec(mx(), my(), L.cols@1) {
+                set a@2, a@0 = false, true
+            } else {
+                if in_rec(mx(), my(), L.cols@2) { set a@0, a@1 = false, true }
+            }
+        }
+    }
+    if b.x >= 1100 { set L.done = true }
+}
+func draw08 () {
+    val L = L08
+    rl.rectangle(1100, (H//2) - 20, 40, 40, rl.GRAY)
+    rect(L.box, rl.LIGHTGRAY)
+    loop i in 3 {
+        if L08.active@i { rect(L.cols@i, rl.GRAY) }
+    }
+}
+
+;; 09: 21 boxes; the white one starts a chain of clicks, against a clock
+val L09 = [reset=0, enable=false, recs=[], color=[], activated=[]]  ;; reset, enable: never reset
+loop i in 21 {                          ;; zero, as the statics of the C: the
+    set L09.recs@i = [x=0, y=0, w=0, h=0]   ;; key 9 starts it with no init
+    set L09.color@i = 0
+    set L09.activated@i = false
+}
+func colors09 () {
+    loop i in 21 {
+        set L09.color@i = if (i % 2) == 0 => rl.LIGHTGRAY => rl.GRAY
+        set L09.activated@i = false
+    }
+    set L09.color@10 = rl.RAYWHITE
+}
+func init09 () {
+    loop i in 21 {
+        set L09.recs@i = [x=(W//7) * (i % 7), y=(H//3) * (i // 7), w=W//7, h=H//3]
+    }
+    colors09()
+}
+func update09 () {
+    val L, c, a = L09, L09.color, L09.activated
+    if L.enable { set L.reset += 1 }
+    if pressed() {
+        loop i in 21 {
+            if in_rec(mx(), my(), L.recs@i) {
+                if i == 10 {
+                    if c@10 == rl.RAYWHITE {
+                        set c@10 = rl.LIGHTGRAY
+                        set L.enable, L.reset = true, 0
+                        set a@1 = true
+                    } else {
+                        set c@10 = rl.RAYWHITE
+                        set L.enable, L.reset = false, 5 * 60
+                        loop j in 21 { set a@j = false }
+                    }
+                } else {
+                    if ((i % 2) == 1) && L.enable && (a@i) {
+                        set c@i = rl.LIGHTGRAY
+                        if i != 19 { set a@(i + 2) = true }
+                    }
+                }
+            }
+        }
+    }
+    if L.reset > ((4 * 60) + 10) {
+        colors09()
+        set L.enable, L.reset = false, 0
+    }
+    var all = true
+    loop _,x in c {
+        if x != rl.LIGHTGRAY { set all = false }
+    }
+    set L.done = all
+}
+func draw09 () {
+    loop i in 21 {
+        rect(L09.recs@i, L09.color@i)
+    }
+}
+
+;; By level: its statics, init, update, draw, the color of the frame of
+;; done, and the frames before a click goes on (the C counts the frames
+;; twice per frame once done, but in level 00).
+val LEVELS = [
+    [L=L00, init=init00, update=update00, draw=draw00, first=29, again=30],
+    [L=L01, init=init01, update=update01, draw=draw01, first=44, again=45],
+    [L=L02, init=init02, update=update02, draw=draw02, first=44, again=45],
+    [L=L03, init=init03, update=update03, draw=draw03, first=44, again=45],
+    [L=L04, init=init04, update=update04, draw=draw04, first=44, again=45],
+    [L=L05, init=init05, update=update05, draw=draw05, first=44, again=45],
+    [L=L06, init=init06, update=update06, draw=draw06, first=44, again=45],
+    [L=L07, init=init07, update=update07, draw=draw07, first=44, again=45],
+    [L=L08, init=init08, update=update08, draw=draw08, first=44, again=45],
+    [L=L09, init=init09, update=update09, draw=draw09, first=44, again=45, border=rl.RAYWHITE],
+]
+loop _,v in LEVELS {
+    set v.L.done, v.L.secs, v.L.frames = false, 0, 0
+}
+
+func init (n) {
+    val v = LEVELS@n
+    set v.L.frames = 0
+    v.init()
+}
+
+;; A level: played until done, with its time in seconds; then, after a
+;; wait, a click goes on. A level done before is not played again.
+task Level (n) {
+    val v = LEVELS@n
+    val L = v.L
+    par :any {
+        if L.done {
+            await rl.Frames(v.again)
+        } else {
+            loop on :rl.frame {
+                set L.frames += 1
+                v.update()
+                until L.done
+            }
+            rl.play_sound(win)
+            set L.secs = L.frames // 60
+            await rl.Frames(v.first)
+        }
+        await :rl.frame until pressed()
+        set pub = true
+        await false
+    } with {
+        val name = string.format("LEVEL %02d", n)
+        loop on :rl.draw {
+            v.draw()
+            if L.done {
+                val c = rl.fade(if v.border => v.border => rl.LIGHTGRAY, 0.6)
+                rl.rectangle(0, 0, W, 60, c)
+                rl.rectangle(0, 60, 60, H - 120, c)
+                rl.rectangle(W - 60, 60, 60, H - 120, c)
+                rl.rectangle(0, H - 60, W, 60, c)
+                rl.text(name, (W//2) - (rl.measure(name, 30)//2), 20, 30, rl.GRAY)
+                rl.text(string.format("DONE! (Seconds: %03d)", L.secs), (W//2) - (rl.measure("DONE! (Seconds: 000)", 30)//2), H - 40, 30, rl.GRAY)
+            } else {
+                rl.text(name, (W//2) - (rl.measure(name, 30)//2), 20, 30, rl.LIGHTGRAY)
+            }
+        }
+    }
+}
+
+;; ---------------------------------------------------------------------------
+;; The screens: 0 is the logo, 1 to 10 the levels 00 to 09, as in the C.
+
+var current = 0                         ;; currentScreen
+var trans, alpha, to = false, 0, -1     ;; onTransition, transAlpha, transToScreen
+
+func request (screen) {                 ;; TransitionToScreen
+    set trans, to = true, screen
+}
+
+spawn {
+    loop on :rl.draw {
+        rl.clear(rl.RAYWHITE)
+    }
+}
+
+;; the music, after the logo
+spawn {
+    loop on :rl.frame {
+        if current != 0 { rl.update_music(music) }
+    }
+}
+
+;; the keys 0 to 9 jump to a level, before the screen updates (9 inits the
+;; level 08, as in the C)
+spawn {
+    loop on :rl.frame {
+        if !trans {
+            var k = nil
+            loop i in 10 {
+                if (k == nil) && rl.key_pressed(48 + i) { set k = i }
+            }
+            if k != nil {
+                request(k + 1)
+                init(if k == 9 => 8 => k)
+            }
+        }
+    }
+}
+
+task LogoScreen () {
+    pin l = spawn Logo(true, nil, \{ rl.play_sound(win) })
+    await :rl.frame until l.pub
+    set pub = true
+    await false
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+func b (x) { if x => 1 => 0 }
+func bs (t, n) {
+    var s = ""
+    loop i in n { set s = s ++ tostring(b(t@i)) }
+    s
+}
+val TRACES = [
+    \{ string.format(" %.4f %.4f %d %d %d %d %d %d", L00.u.y, L00.o.y, b(L00.over_u), b(L00.over_o),
+                     b(L00.placed_u), b(L00.placed_o), b(L00.done), L00.secs) },
+    \{ val l, r = L01.in_l, L01.in_r
+       string.format(" %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %d %d", l.x, l.y, l.w, l.h, r.x, r.y, r.w, r.h, b(L01.done), L01.secs) },
+    \{ string.format(" %.4f %.4f %.0f %.0f %.4f %.4f %d %d", L02.x, L02.y, L02.vx, L02.vy, L02.hx, L02.hy, b(L02.done), L02.secs) },
+    \{ string.format(" %.0f %.0f %d %d %d %d", L03.piece.x, L03.piece.y, b(L03.show), b(L03.selected), b(L03.done), L03.secs) },
+    \{ string.format(" %.0f %.0f %d %d", L04.inner, L04.outer, b(L04.done), L04.secs) },
+    \{ var s = " "
+       loop _,c in L05.color { set s = s ++ tostring(b(c == rl.GRAY)) }
+       s ++ string.format(" %d %d", b(L05.done), L05.secs) },
+    \{ val r = L06.recs
+       string.format(" %.0f %.0f %.0f %.0f %s %d %d %d %d %d %d %d", (r@0).x, (r@1).x, (r@2).x, (r@3).x, bs(L06.stopped, 4),
+                     L06.speed@0, L06.speed@1, L06.speed@2, L06.speed@3, L06.over, b(L06.done), L06.secs) },
+    \{ var c = ""
+       loop _,x in L07.color { set c = c ++ tostring(b(x == rl.LIGHTGRAY)) }
+       string.format(" %s %s %d %d", bs(L07.active, 3), c, b(L07.done), L07.secs) },
+    \{ string.format(" %.0f %d %s %d %d", L08.box.x, L08.speed, bs(L08.active, 3), b(L08.done), L08.secs) },
+    \{ var c = ""
+       loop _,x in L09.color { set c = c ++ (if x == rl.LIGHTGRAY => "L" => if x == rl.GRAY => "G" => "W") }
+       string.format(" %s %s %d %d %d %d", c, bs(L09.activated, 21), L09.reset, b(L09.enable), b(L09.done), L09.secs) },
+]
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            val l = if current > 0 => (TRACES@(current - 1))() => ""
+            print(string.format("%d %d %d %.4f %d", rl.frame(), current, b(trans), alpha, to) ++ l)
+        }
+    }
+}
+;; [/trace]
+
+loop {
+    pin s = spawn (if current == 0 => LogoScreen => Level)(current - 1)
+    spawn {
+        loop on :rl.draw {
+            if trans {
+                rl.rectangle(0, 0, W, H, rl.fade(rl.RAYWHITE, alpha))
+            }
+        }
+    }
+    if trans {
+        ;; the fade out, over the new screen, which is drawn but not updated
+        toggle s(false) with :rl.draw
+        loop {
+            await :rl.frame
+            set alpha = f32(alpha - f32(0.02))
+            until alpha <= 0
+        }
+        set alpha, trans, to = 0, false, -1
+        toggle s(true)
+    }
+    await :rl.frame until s.pub || trans
+    if s.pub {
+        if current == 0 {
+            request(1)
+            init(0)
+            rl.play_music(music)
+            rl.music_volume(music, 0.6)
+        } else {
+            val n = (current % 10) + 1          ;; level 09 goes back to 00
+            request(n)
+            init(n - 1)
+        }
+    }
+    ;; the fade in, over the old screen, which is drawn but not updated
+    toggle s(false) with :rl.draw
+    loop {
+        await :rl.frame
+        set alpha = f32(alpha + f32(0.02))
+        until alpha >= 1
+    }
+    set alpha, current = 1, to
+}

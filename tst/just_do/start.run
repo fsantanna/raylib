@@ -1,0 +1,5 @@
+# The logo, level 00 with the U falling, the key 1 to level 01.
+FRAMES=900
+SEED=1
+INPUT=750:dn:1,751:up:1
+SHOTS="1 85 140 300 450 520 600 700 760 801 850 900"

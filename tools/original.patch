@@ -606,3 +606,295 @@ index 447ea61..da79538 100644
          BeginDrawing();
  
              ClearBackground(RAYWHITE);
+diff --git a/just_do/src/just_do.c b/just_do/src/just_do.c
+index 754fedf..00e7b5b 100644
+--- a/just_do/src/just_do.c
++++ b/just_do/src/just_do.c
+@@ -13,6 +13,19 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++void TraceLevel00Screen(void);
++void TraceLevel01Screen(void);
++void TraceLevel02Screen(void);
++void TraceLevel03Screen(void);
++void TraceLevel04Screen(void);
++void TraceLevel05Screen(void);
++void TraceLevel06Screen(void);
++void TraceLevel07Screen(void);
++void TraceLevel08Screen(void);
++void TraceLevel09Screen(void);
+ #include "screens.h"    // NOTE: Declares global (extern) variables and screens functions
+ 
+ #if defined(PLATFORM_WEB)
+@@ -362,6 +375,27 @@ static void UpdateDrawFrame(void)
+ 
+     // Draw
+     //----------------------------------------------------------------------------------
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        printf("%d %d %d %.4f %d", RltFrame(), currentScreen, onTransition, transAlpha, transToScreen);
++        switch (currentScreen)
++        {
++            case LEVEL00: TraceLevel00Screen(); break;
++            case LEVEL01: TraceLevel01Screen(); break;
++            case LEVEL02: TraceLevel02Screen(); break;
++            case LEVEL03: TraceLevel03Screen(); break;
++            case LEVEL04: TraceLevel04Screen(); break;
++            case LEVEL05: TraceLevel05Screen(); break;
++            case LEVEL06: TraceLevel06Screen(); break;
++            case LEVEL07: TraceLevel07Screen(); break;
++            case LEVEL08: TraceLevel08Screen(); break;
++            case LEVEL09: TraceLevel09Screen(); break;
++            default: break;
++        }
++        printf("\n");
++    }
++
+     BeginDrawing();
+ 
+         ClearBackground(RAYWHITE);
+diff --git a/just_do/src/screen_level00.c b/just_do/src/screen_level00.c
+index 2418de8..ff5a173 100644
+--- a/just_do/src/screen_level00.c
++++ b/just_do/src/screen_level00.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -164,4 +165,9 @@ void DrawRectangleBordersRec(Rectangle rec, int offsetX, int offsetY, int border
+     DrawRectangle(rec.x + offsetX, rec.y + borderSize + offsetY, borderSize, rec.height - borderSize*2, col);
+     DrawRectangle(rec.x + rec.width - borderSize + offsetX, rec.y + borderSize + offsetY, borderSize, rec.height - borderSize*2, col);
+     DrawRectangle(rec.x + offsetX, rec.y + rec.height - borderSize + offsetY, rec.width, borderSize, col);
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel00Screen(void)
++{
++    printf(" %.4f %.4f %d %d %d %d %d %d", boundsU.y, boundsO.y, mouseOverU, mouseOverO, placedU, placedO, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level01.c b/just_do/src/screen_level01.c
+index a0d069c..95ad7ec 100644
+--- a/just_do/src/screen_level01.c
++++ b/just_do/src/screen_level01.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -160,4 +161,9 @@ void UnloadLevel01Screen(void)
+ int FinishLevel01Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel01Screen(void)
++{
++    printf(" %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %d %d", innerLeftRec.x, innerLeftRec.y, innerLeftRec.width, innerLeftRec.height, innerRightRec.x, innerRightRec.y, innerRightRec.width, innerRightRec.height, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level02.c b/just_do/src/screen_level02.c
+index 9d2a8c9..728ce21 100644
+--- a/just_do/src/screen_level02.c
++++ b/just_do/src/screen_level02.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ #include <math.h>
+@@ -154,4 +155,9 @@ void UnloadLevel02Screen(void)
+ int FinishLevel02Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel02Screen(void)
++{
++    printf(" %.4f %.4f %.0f %.0f %.4f %.4f %d %d", bouncingBallPos.x, bouncingBallPos.y, bouncingBallSpeed.x, bouncingBallSpeed.y, holeCirclePos.x, holeCirclePos.y, ballOnHole, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level03.c b/just_do/src/screen_level03.c
+index 7e4f16e..81944ad 100644
+--- a/just_do/src/screen_level03.c
++++ b/just_do/src/screen_level03.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -131,4 +132,9 @@ void UnloadLevel03Screen(void)
+ int FinishLevel03Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel03Screen(void)
++{
++    printf(" %.0f %.0f %d %d %d %d", pieceRec.x, pieceRec.y, showPiece, pieceSelected, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level04.c b/just_do/src/screen_level04.c
+index bce627c..636be35 100644
+--- a/just_do/src/screen_level04.c
++++ b/just_do/src/screen_level04.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -144,4 +145,9 @@ void UnloadLevel04Screen(void)
+ int FinishLevel04Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel04Screen(void)
++{
++    printf(" %.0f %.0f %d %d", innerCircleRadius, outerCircleRadius, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level05.c b/just_do/src/screen_level05.c
+index 5d3337c..673332e 100644
+--- a/just_do/src/screen_level05.c
++++ b/just_do/src/screen_level05.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ #define NUM_CIRCLES 10
+@@ -182,4 +183,9 @@ int FinishLevel05Screen(void)
+ static bool CheckColor(Color col1, Color col2)
+ {
+     return ((col1.r == col2.r) && (col1.g == col2.g) && (col1.b == col2.b) && (col1.a == col2.a));
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel05Screen(void)
++{
++    printf(" "); for (int i = 0; i < NUM_CIRCLES; i++) printf("%d", CheckColor(circleColor[i], GRAY)); printf(" %d %d", done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level06.c b/just_do/src/screen_level06.c
+index a519313..125b8c7 100644
+--- a/just_do/src/screen_level06.c
++++ b/just_do/src/screen_level06.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -153,4 +154,9 @@ void UnloadLevel06Screen(void)
+ int FinishLevel06Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel06Screen(void)
++{
++    printf(" %.0f %.0f %.0f %.0f %d%d%d%d %d %d %d %d %d %d %d", movingRecs[0].x, movingRecs[1].x, movingRecs[2].x, movingRecs[3].x, stoppedRec[0], stoppedRec[1], stoppedRec[2], stoppedRec[3], speedRecs[0], speedRecs[1], speedRecs[2], speedRecs[3], mouseOverNum, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level07.c b/just_do/src/screen_level07.c
+index 30101dd..6dd448a 100644
+--- a/just_do/src/screen_level07.c
++++ b/just_do/src/screen_level07.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -175,4 +176,9 @@ int FinishLevel07Screen(void)
+ static bool CheckColor(Color col1, Color col2)
+ {
+     return ((col1.r == col2.r) && (col1.g == col2.g) && (col1.b == col2.b) && (col1.a == col2.a));
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel07Screen(void)
++{
++    printf(" %d%d%d %d%d%d %d %d", leftCircleActive, middleCircleActive, rightCircleActive, CheckColor(leftCircleColor, LIGHTGRAY), CheckColor(middleCircleColor, LIGHTGRAY), CheckColor(rightCircleColor, LIGHTGRAY), done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level08.c b/just_do/src/screen_level08.c
+index 1f0f8b1..379b84d 100644
+--- a/just_do/src/screen_level08.c
++++ b/just_do/src/screen_level08.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ //----------------------------------------------------------------------------------
+@@ -154,4 +155,9 @@ void UnloadLevel08Screen(void)
+ int FinishLevel08Screen(void)
+ {
+     return finishScreen;
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel08Screen(void)
++{
++    printf(" %.0f %d %d%d%d %d %d", movingBox.x, moveSpeed, leftColumnActive, middleColumnActive, rightColumnActive, done, levelTimeSec);
++}
+diff --git a/just_do/src/screen_level09.c b/just_do/src/screen_level09.c
+index b9e3235..f31fcfe 100644
+--- a/just_do/src/screen_level09.c
++++ b/just_do/src/screen_level09.c
+@@ -24,6 +24,7 @@
+ **********************************************************************************************/
+ 
+ #include "raylib.h"
++#include <stdio.h>          // Atmos port: trace
+ #include "screens.h"
+ 
+ #define NUM_BOXES   21
+@@ -196,4 +197,9 @@ int FinishLevel09Screen(void)
+ static bool CheckColor(Color col1, Color col2)
+ {
+     return ((col1.r == col2.r) && (col1.g == col2.g) && (col1.b == col2.b) && (col1.a == col2.a));
+-}
+\ No newline at end of file
++}
++// Atmos port: trace of the level, after its logic
++void TraceLevel09Screen(void)
++{
++    printf(" "); for (int i = 0; i < NUM_BOXES; i++) printf("%c", CheckColor(bwColors[i], LIGHTGRAY)? 'L' : CheckColor(bwColors[i], GRAY)? 'G' : 'W'); printf(" "); for (int i = 0; i < NUM_BOXES; i++) printf("%d", activated[i]); printf(" %d %d %d %d", resetCounter, enableCounter, done, levelTimeSec);
++}
