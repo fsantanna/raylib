@@ -36,4 +36,4 @@ the runs: no number here is typed by hand.
 | light_my_ritual | 901 | 487 | 7087 | 4424 | 5 | 2 | 2 (8700 frames, 34 screens) | yes |
 | transmission | 1125 | 647 | 6898 | 5537 | 6 | 3 | 2 (7036 frames, 37 screens) | yes |
 | drturtle | 293 | 222 | 2416 | 1891 | 4 | 1 | 2 (3700 frames, 17 screens) | yes |
-| just_do | 1454 | 700 | 9350 | 6490 | 5 | 4 | 2 (4801 frames, 47 screens) | no |
+| just_do | 1454 | 700 | 9350 | 6490 | 5 | 4 | 2 (4801 frames, 47 screens) | yes |
