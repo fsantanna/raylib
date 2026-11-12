@@ -28,6 +28,36 @@ index b5fd3c9..91ee5a0 100644
  }
  
  // Draw game (one frame)
+diff --git a/classics/src/asteroids.c b/classics/src/asteroids.c
+index b83efae..437b047 100644
+--- a/classics/src/asteroids.c
++++ b/classics/src/asteroids.c
+@@ -13,6 +13,9 @@
+ 
+ #include "raylib.h"
+ 
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
++
+ #include <math.h>
+ 
+ #if defined(PLATFORM_WEB)
+@@ -500,6 +503,15 @@ void UpdateGame(void)
+             gameOver = false;
+         }
+     }
++
++    // Atmos port: trace, one line per frame, after its logic (the phase only
++    // in the frame of a game over: the rest of that frame may still change it)
++    if (RltFrame() > 0)
++    {
++        if (gameOver) printf("%d over\n", RltFrame());
++        else printf("%d %s %.6f %.6f %.0f %.6f %d\n", RltFrame(), pause? "pause" : "play",
++            player.position.x, player.position.y, player.rotation, player.acceleration, destroyedMeteorsCount);
++    }
+ }
+ 
+ // Draw game (one frame)
 diff --git a/classics/src/asteroids_survival.c b/classics/src/asteroids_survival.c
 index cf85bcb..624ebae 100644
 --- a/classics/src/asteroids_survival.c

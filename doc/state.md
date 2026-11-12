@@ -179,3 +179,24 @@ Left in the port for the trace only: `phase`, `missiles_on`.
 | `explosionNumber` (static) | control: the next slot | gone |
 
 Left in the port for the trace only: `phase`.
+
+## asteroids
+
+| C | Kind | Port |
+|---|------|------|
+| `screenWidth`, `screenHeight` | constant | `W`, `H` |
+| `gameOver` | control | `Play` awaits `:over`, which a meteor emits when it touches the ship |
+| `pause` | control | `Classic` |
+| `victory` | control | gone: "VICTORY" is drawn when `kills == 28` |
+| `shipHeight` | constant | `SHIP_H` |
+| `player` | drawn, and data | `ship`, as in `asteroids_survival` |
+| `shoot[].active` | control | the phase of each `Shot`: waits to be fired, then flies |
+| `shoot[].lifeSpawn` | control: 60 frames of life | `loop n in (1, 60)` |
+| `shoot[]` `.position`, `.speed`, `.rotation` | drawn, and data | the `pub` of each `Shot` |
+| `bigMeteor[]`, `mediumMeteor[]`, `smallMeteor[]` `.active` | control: alive, or a faded ghost | the two phases of `Meteor`; **left**: `pub.on`, which the rules read to skip the ghosts |
+| `...Meteor[]` `.position`, `.speed` | drawn, and data | the `pub` of each `Meteor` |
+| `midMeteorsCount`, `smallMeteorsCount` | control: the next slot, whose parity gives the direction | gone: `#mediums`, `#smalls` |
+| `destroyedMeteorsCount` | score | `kills` |
+| `.radius`, `.color` | constant | literals |
+
+Left in the port for the trace only: `phase`.

@@ -256,3 +256,27 @@ Trace: frame, phase, turn, ball, power and angle of each player.
   and moves from the next frame; in the frame it lands the next player's
   aim is drawn with the point of its last turn, and it follows the mouse
   from the frame after.
+
+## asteroids
+
+Same as the original on its runs `win` (672 frames, 15 screens: the ship
+turns to the nearest meteor and fires, with a pause, until the 28 are
+destroyed and "VICTORY" shows) and `die` (577 frames, 10 screens, seed 2:
+nine kills, then a meteor; an ENTER in the frame of the game over, a
+restart).
+
+Trace: frame, phase, ship, meteors destroyed; in the frame of a game over,
+the phase only (the C goes on with that frame, the port ends the game; not
+drawn, and reset by the next game).
+
+- As in `asteroids_survival`: the floats of the ship, and `correctRange`.
+- **Order.** Each shot, in the order of its slot, is checked against the
+  first big, the first medium, and the first small meteor that it touches,
+  even after a hit: one shot may destroy two meteors. The meteors that a
+  split makes are alive at once, and the checks that follow in the same
+  frame see them. The port keeps the shots as slots, the meteors as pools in
+  the order of their slots, and the checks in one task at the end of the
+  frame.
+- **Ghosts.** A destroyed meteor stays drawn, faded, where it was, in its
+  place among the others: in the port, a meteor is a task that goes on, as a
+  ghost, after it is hit.

@@ -1,0 +1,7 @@
+# Seed 2: the ship fires for 150 frames, then only thrusts until a meteor
+# hits it; an ENTER in the frame of the game over (ignored), a restart, and
+# 300 frames with no input. Made by gen.py.
+FRAMES=577
+SEED=2
+INPUT=1:dn:LEFT,5:up:LEFT,5:dn:SPACE,6:up:SPACE,10:dn:LEFT,11:up:LEFT,13:dn:SPACE,14:up:SPACE,17:dn:LEFT,18:up:LEFT,21:dn:SPACE,22:up:SPACE,28:dn:LEFT,29:up:LEFT,29:dn:SPACE,30:up:SPACE,36:dn:LEFT,37:up:LEFT,37:dn:SPACE,38:up:SPACE,38:dn:RIGHT,46:up:RIGHT,46:dn:SPACE,47:up:SPACE,51:dn:RIGHT,52:up:RIGHT,54:dn:SPACE,55:up:SPACE,61:dn:RIGHT,62:up:RIGHT,62:dn:SPACE,63:up:SPACE,64:dn:RIGHT,66:up:RIGHT,70:dn:RIGHT,71:up:RIGHT,71:dn:SPACE,72:up:SPACE,79:dn:SPACE,80:up:SPACE,82:dn:RIGHT,85:up:RIGHT,87:dn:SPACE,88:up:SPACE,95:dn:SPACE,96:up:SPACE,103:dn:SPACE,104:up:SPACE,104:dn:LEFT,106:up:LEFT,111:dn:LEFT,112:up:LEFT,112:dn:SPACE,113:up:SPACE,115:dn:RIGHT,121:up:RIGHT,121:dn:SPACE,122:up:SPACE,124:dn:LEFT,132:up:LEFT,132:dn:RIGHT,151:up:RIGHT,151:dn:UP,246:up:UP,246:dn:ENTER,247:up:ENTER,276:dn:ENTER,277:up:ENTER
+SHOTS="1 50 100 150 245 246 247 276 277 577"

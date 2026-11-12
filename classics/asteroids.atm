@@ -1,0 +1,281 @@
+;; raylib - classic game: asteroids
+;;
+;; Sample game developed by Ian Eito, Albert Martos and Ramon Santamaria.
+;; Copyright (c) 2015 Ramon Santamaria (@raysan5), zlib license.
+;;
+;; Ported to Atmos: an altered version of `classics/src/asteroids.c` of
+;; raysan5/raylib-games. The game is the same; its control is written as
+;; sequences: `gameOver`, `pause`, `victory`, the `active` flags, and
+;; `lifeSpawn` of the C became tasks, awaits, and a toggle.
+
+include "../raylib.atm"
+include "classic.atm"
+
+val W, H    = 800, 450
+val f32     = rl.f32            ;; the ship moves on floats, as in the C
+val DEG2RAD = f32(f32(3.14159265358979323846) / 180)
+val BASE    = 20                ;; PLAYER_BASE_SIZE
+val SPEED   = 6                 ;; PLAYER_SPEED
+val SHIP_H  = f32((BASE/2) / rl.tanf(f32(20*DEG2RAD)))
+val WX, HY  = f32(W + SHIP_H), f32(H + SHIP_H)     ;; beyond the borders
+
+rl.window [title="classic game: asteroids", width=W, height=H, fps=60]
+
+var ship = [x=0, y=0, rot=0, acc=0, cx=0, cy=0]
+var kills = 0                   ;; for the trace
+var fire = nil                  ;; the ship asks the first free shot, in this frame
+
+;; The collider, a circle ahead of the center, as in the C (sin and cos on
+;; doubles, stored in floats).
+func collider () {
+    val a = f32(ship.rot * DEG2RAD)
+    set ship.cx = f32(ship.x + (math.sin(a) * f32(SHIP_H/2.5)))
+    set ship.cy = f32(ship.y - (math.cos(a) * f32(SHIP_H/2.5)))
+}
+
+task Ship () {
+    par {
+        loop on :rl.frame {
+            if rl.key_down('LEFT')  { set ship.rot -= 5 }
+            if rl.key_down('RIGHT') { set ship.rot += 5 }
+            val a  = f32(ship.rot * DEG2RAD)
+            val sx = f32(math.sin(a) * SPEED)
+            val sy = f32(math.cos(a) * SPEED)
+            if rl.key_down('UP') {
+                if ship.acc < 1 { set ship.acc = f32(ship.acc + f32(0.04)) }
+            } else {
+                ifs {
+                    ship.acc > 0 => { set ship.acc = f32(ship.acc - f32(0.02)) }
+                    ship.acc < 0 => { set ship.acc = 0 }
+                }
+            }
+            if rl.key_down('DOWN') {
+                ifs {
+                    ship.acc > 0 => { set ship.acc = f32(ship.acc - f32(0.04)) }
+                    ship.acc < 0 => { set ship.acc = 0 }
+                }
+            }
+            set ship.x = f32(ship.x + f32(sx * ship.acc))
+            set ship.y = f32(ship.y - f32(sy * ship.acc))
+            ifs {
+                ship.x > WX      => { set ship.x = -SHIP_H }
+                ship.x < -SHIP_H => { set ship.x = WX }
+            }
+            ifs {
+                ship.y > HY      => { set ship.y = -SHIP_H }
+                ship.y < -SHIP_H => { set ship.y = HY }
+            }
+            collider()
+            if rl.key_pressed('SPACE') {
+                val a = f32(ship.rot * DEG2RAD)
+                set fire = [x=f32(ship.x + (math.sin(a)*SHIP_H)), y=f32(ship.y - (math.cos(a)*SHIP_H)),
+                            sx=f32((1.5*math.sin(a))*SPEED), sy=f32((1.5*math.cos(a))*SPEED), rot=ship.rot]
+            }
+        }
+    } with {
+        loop on :rl.draw {
+            val a = f32(ship.rot * DEG2RAD)
+            val s, c = rl.sinf(a), rl.cosf(a)
+            rl.triangle(f32(ship.x + f32(s*SHIP_H)), f32(ship.y - f32(c*SHIP_H)),
+                        f32(ship.x - f32(c*(BASE/2))), f32(ship.y - f32(s*(BASE/2))),
+                        f32(ship.x + f32(c*(BASE/2))), f32(ship.y + f32(s*(BASE/2))), rl.MAROON)
+        }
+    }
+}
+
+;; A meteor: while alive, ends the game when it touches the ship, which
+;; moved before it, and moves across the borders; once destroyed (`:hit`),
+;; stays drawn, faded, where it was, in its place in the drawing order.
+task Meteor (game, m, r, color) {
+    set pub = m
+    set pub.on = true
+    par :any {
+        loop on :rl.frame {
+            if rl.check_collision_circles(ship.cx, ship.cy, 12, m.x, m.y, r) {
+                emit @game :over
+            }
+            set m.x = f32(m.x + m.vx)
+            set m.y = f32(m.y + m.vy)
+            ifs {
+                m.x > (W + r) => { set m.x = -r }
+                m.x < (0 - r) => { set m.x = W + r }
+            }
+            ifs {
+                m.y > (H + r) => { set m.y = -r }
+                m.y < (0 - r) => { set m.y = H + r }
+            }
+        }
+    } with {
+        loop on :rl.draw {
+            rl.circle_v(m.x, m.y, r, color)
+        }
+    } with {
+        await :hit
+    }
+    set pub.on = false
+    val faded = rl.fade(rl.LIGHTGRAY, 0.3)
+    loop on :rl.draw {
+        rl.circle_v(m.x, m.y, r, faded)
+    }
+}
+
+;; A shot: a slot that waits to be fired, flies for 60 frames, until it
+;; leaves the screen, or until it hits (`:hit`), and is free again. The
+;; first free slot takes the request of the ship, in the same frame.
+task Shot () {
+    loop {
+        set pub = nil
+        await :rl.frame until fire
+        set pub = fire
+        set fire = nil
+        watching :hit {
+            loop n in (1, 60) {
+                set pub.x = f32(pub.x + pub.sx)
+                set pub.y = f32(pub.y - pub.sy)
+                until (pub.x > (W + 2)) || (pub.x < -2) || (pub.y > (H + 2)) || (pub.y < -2) || (n == 60)
+                await :rl.frame
+            }
+        }
+    }
+}
+
+;; One game: ends when a meteor touches the ship.
+;;
+;; In each frame, in the order of the C: the ship (and a request to fire),
+;; the shots, the meteors (big, medium, small), and the hits. Drawn in the
+;; order of the C: the ship, the meteors, the shots, "VICTORY".
+task Play () {
+    set ship = [x=W//2, y=f32((H//2) - f32(SHIP_H/2)), rot=0, acc=0, cx=0, cy=0]
+    collider()
+    set kills, fire = 0, nil
+
+    ;; The big meteors start out of the center. As in the C, `ok` is not
+    ;; reset after the speeds, so only the first one checks its x.
+    var ok = false
+    val meteor = func () {
+        var x = rl.random(0, W)
+        loop {
+            until ok
+            if (x > ((W//2) - 150)) && (x < ((W//2) + 150)) {
+                set x = rl.random(0, W)
+            } else {
+                set ok = true
+            }
+        }
+        set ok = false
+        var y = rl.random(0, H)
+        loop {
+            until ok
+            if (y > ((H//2) - 150)) && (y < ((H//2) + 150)) {
+                set y = rl.random(0, H)
+            } else {
+                set ok = true
+            }
+        }
+        set ok = false
+        var vx = rl.random(-2, 2)
+        var vy = rl.random(-2, 2)
+        loop {
+            until ok
+            if (vx == 0) && (vy == 0) {
+                set vx = rl.random(-2, 2)
+                set vy = rl.random(-2, 2)
+            } else {
+                set ok = true
+            }
+        }
+        [x=x, y=y, vx=vx, vy=vy]
+    }
+
+    spawn Ship()
+    pin shots = tasks(10)
+    loop _ in 10 {
+        spawn @shots Shot()
+    }
+    pin bigs = tasks()
+    loop _ in 4 {
+        spawn @bigs Meteor(task, meteor(), 40, rl.DARKGRAY)
+    }
+    pin mediums = tasks()
+    pin smalls  = tasks()
+
+    ;; the hits: each shot, in the order of the slots, against the first big,
+    ;; the first medium, and the first small meteor that it touches, even
+    ;; after a hit, as in the C; a big one splits in two medium ones, a medium
+    ;; one in two small ones, in the direction of the shot
+    val game = task
+    val split = func (pool, m, rot, r) {
+        loop _ in 2 {
+            val a = f32(rot * DEG2RAD)
+            val sign = if (#pool % 2) == 0 => -1 => 1
+            spawn @pool Meteor(game, [x=m.x, y=m.y, vx=f32((math.cos(a)*2)*sign), vy=f32((math.sin(a)*2)*sign)], r, rl.GRAY)
+        }
+    }
+    spawn {
+        loop on :rl.frame {
+            loop _,s in shots {
+                val p = s.pub
+                if p {
+                    var hit = false
+                    loop _,m in bigs {
+                        if m.pub.on && rl.check_collision_circles(p.x, p.y, 2, m.pub.x, m.pub.y, 40) {
+                            emit @m :hit
+                            set kills, hit = kills + 1, true
+                            split(mediums, m.pub, p.rot, 20)
+                            break
+                        }
+                    }
+                    loop _,m in mediums {
+                        if m.pub.on && rl.check_collision_circles(p.x, p.y, 2, m.pub.x, m.pub.y, 20) {
+                            emit @m :hit
+                            set kills, hit = kills + 1, true
+                            split(smalls, m.pub, p.rot, 10)
+                            break
+                        }
+                    }
+                    loop _,m in smalls {
+                        if m.pub.on && rl.check_collision_circles(p.x, p.y, 2, m.pub.x, m.pub.y, 10) {
+                            emit @m :hit
+                            set kills, hit = kills + 1, true
+                            break
+                        }
+                    }
+                    if hit {
+                        emit @s :hit
+                    }
+                }
+            }
+        }
+    }
+    spawn {
+        loop on :rl.draw {
+            loop _,s in shots {
+                if s.pub {
+                    rl.circle_v(s.pub.x, s.pub.y, 2, rl.BLACK)
+                }
+            }
+            if kills == 28 {
+                rl.text("VICTORY", (W//2) - (rl.measure("VICTORY",20)//2), H//2, 20, rl.LIGHTGRAY)
+            }
+        }
+    }
+    await :over
+}
+
+;; [trace] of the test mode: one line per frame, after its logic (in the
+;; frame of a game over, the phase only: see doc/fidelity.md)
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            if phase == :over {
+                print(string.format("%d %s", rl.frame(), phase))
+            } else {
+                print(string.format("%d %s %.6f %.6f %.0f %.6f %d", rl.frame(), phase,
+                    ship.x, ship.y, ship.rot, ship.acc, kills))
+            }
+        }
+    }
+}
+;; [/trace]
+
+await Classic(Play)
