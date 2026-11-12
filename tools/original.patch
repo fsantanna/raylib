@@ -1207,3 +1207,33 @@ index 74a5641..772afd2 100644
      BeginDrawing();
  
          ClearBackground(RAYWHITE);
+diff --git a/retro_maze_3d/src/retro_maze_3d.c b/retro_maze_3d/src/retro_maze_3d.c
+index 0df3819..a890f59 100644
+--- a/retro_maze_3d/src/retro_maze_3d.c
++++ b/retro_maze_3d/src/retro_maze_3d.c
+@@ -10,6 +10,9 @@
+ ********************************************************************************************/
+ 
+ #include "raylib.h"
++
++#include <stdio.h>          // Atmos port: trace
++int RltFrame(void);         // Atmos port: frame of the test mode (tools/raylib.patch)
+ #include "raymath.h"
+ 
+ #include <math.h>       // Required for:
+@@ -563,6 +566,15 @@ static void UpdateDrawFrame(void)
+     //----------------------------------------------------------------------------------
+ 
+     // Render all screen to a texture
++    // Atmos port: trace, one line per frame, after its logic
++    if (RltFrame() > 0)
++    {
++        printf("%d %d %d %d %d | %.4f %.4f %.4f %.4f %.4f %.4f | %d %d %d %.4f %d %d | %d %d %.4f %d %d %d\n", RltFrame(), currentScreen, titleState, elementPositionY, optionSelect,
++            camera.position.x, camera.position.y, camera.position.z, camera.target.x, camera.target.y, camera.target.z,
++            playerCellX, playerCellY, timeLevelSeconds, staminaLevel, playerMoving, stepFrameCount,
++            showInGameMenu, showMinimapDebug, creditsScrollingPosY, endingResult, gpiCaseMode, exitGame);
++    }
++
+     BeginTextureMode(screenTarget);
+         ClearBackground(GB_GREEN01);
+ 

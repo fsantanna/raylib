@@ -1,0 +1,7 @@
+# The logo, the title (down, the 3D, the shadows), the menu down and up;
+# start; walk forward, turn with the mouse, the map (M), the pause menu
+# (SPACE) and resume.
+FRAMES=700
+SEED=1
+INPUT=380:dn:DOWN,381:up:DOWN,400:dn:UP,401:up:UP,450:dn:ENTER,451:up:ENTER,460:dn:W,520:up:W,500:mv:200:120,540:dn:M,541:up:M,560:dn:SPACE,561:up:SPACE,580:dn:DOWN,581:up:DOWN,600:dn:UP,601:up:UP,620:dn:ENTER,621:up:ENTER,630:dn:A,660:up:A
+SHOTS="1 55 56 300 301 302 400 441 442 443 450 451 500 520 541 560 580 620 660 700"

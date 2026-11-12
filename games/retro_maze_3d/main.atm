@@ -1,0 +1,504 @@
+;; RETRO MAZE 3D (GGJ 2021), by Ramon Santamaria (@raysan5), with German
+;; Sartori (music and sound), credited in README.original.md. Copyright (c)
+;; 2021 Ramon Santamaria (@raysan5), zlib license. The art and sound are
+;; those of the original.
+;;
+;; Ported to Atmos: an altered version of `retro_maze_3d/src/retro_maze_3d.c`
+;; of raysan5/raylib-games. The game is the same. Its screens (one switch
+;; in one function in the C) are tasks that return the next one; the logo,
+;; the animation of the title, and the menus are awaits and loops. The maze
+;; (its mesh, its model, the camera, and the collisions against the pixels
+;; of the map) is the C of the original, in the prelude below.
+
+include "../../raylib.atm"
+
+```:prelude
+#define GB_GREEN01 (Color){ 155, 188, 15, 255 }
+#define GB_GREEN02 (Color){ 110, 150, 27, 255 }
+#define GB_GREEN03 (Color){ 48, 98, 48, 255 }
+#define GB_GREEN04 (Color){ 15, 56, 15, 255 }
+
+static Camera rm_camera = { 0 };
+static Vector3 rm_map_position = { 0.0f, 0.0f, 0.0f };
+static Vector3 rm_player_position = { 0 };
+static int rm_exit_x = 19;
+static int rm_exit_y = 9;
+static Color *rm_map_pixels = 0;
+static int rm_cell_x = 0;
+static int rm_cell_y = 0;
+static bool rm_moving = false;
+static Texture2D rm_tex_map = { 0 };
+static Texture2D rm_tex_atlas = { 0 };
+static Model rm_model = { 0 };
+
+static void rm_load (void) {
+    rm_camera.position = (Vector3){ 2.5f, 0.3f, 23.5f };
+    rm_camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
+    rm_camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    rm_camera.fovy = 45.0f;
+    rm_camera.projection = CAMERA_PERSPECTIVE;
+    rm_player_position = rm_camera.position;
+    Image imMap = LoadImage("resources/game_map.png");
+    Mesh mesh = GenMeshCubicmap(imMap, (Vector3){ 1.0f, 1.0f, 1.0f });
+    rm_model = LoadModelFromMesh(mesh);
+    rm_tex_atlas = LoadTexture("resources/cubicmap_atlas.png");
+    rm_model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = rm_tex_atlas;
+    rm_map_pixels = LoadImageColors(imMap);
+    ImageColorReplace(&imMap, WHITE, GB_GREEN03);
+    ImageColorReplace(&imMap, BLACK, GB_GREEN02);
+    rm_tex_map = LoadTextureFromImage(imMap);
+    UnloadImage(imMap);
+}
+
+static void rm_start (void) {           // a new game: the camera at the start
+    rm_camera.position = (Vector3){ 2.5f, 0.3f, 23.5f };
+    rm_player_position = rm_camera.position;
+}
+
+// UpdateCameraCustom of the C (first person, keys and mouse)
+static void rm_update_camera (Camera *camera) {
+    bool direction[4] = { (IsKeyDown(KEY_W) || (GetGamepadAxisMovement(0, 7) < 0)),
+                          (IsKeyDown(KEY_S) || (GetGamepadAxisMovement(0, 7) > 0)),
+                          (IsKeyDown(KEY_D) || (GetGamepadAxisMovement(0, 6) > 0)),
+                          (IsKeyDown(KEY_A) || (GetGamepadAxisMovement(0, 6) < 0)) };
+    if (direction[0] || direction[1] || direction[2] || direction[3]) rm_moving = true;
+    else rm_moving = false;
+    Vector3 movement = {0};
+    if (direction[0]) movement.x += 0.05f;
+    if (direction[1]) movement.x -= 0.05f;
+    if (direction[2]) movement.y += 0.05f;
+    if (direction[3]) movement.y -= 0.05f;
+    Vector3 rotation = {0};
+    rotation.x += GetMouseDelta().x*0.05f;
+    rotation.y += GetMouseDelta().y*0.05f;
+    UpdateCameraPro(camera, movement, rotation, 0.0f);
+}
+
+// The move of the player: the camera, then the collisions with the walls of
+// the map (back to the old position on any); returns whether it is out.
+static bool rm_move (void) {
+    Vector3 oldCamPos = rm_camera.position;
+    rm_update_camera(&rm_camera);
+    Vector2 playerPos = { rm_camera.position.x, rm_camera.position.z };
+    float playerRadius = 0.1f;
+    rm_cell_x = (int)(playerPos.x - rm_map_position.x + 0.5f);
+    rm_cell_y = (int)(playerPos.y - rm_map_position.z + 0.5f);
+    if (rm_cell_x < 0) rm_cell_x = 0;
+    else if (rm_cell_x >= rm_tex_map.width) rm_cell_x = rm_tex_map.width - 1;
+    if (rm_cell_y < 0) rm_cell_y = 0;
+    else if (rm_cell_y >= rm_tex_map.height) rm_cell_y = rm_tex_map.height - 1;
+    for (int y = 0; y < rm_tex_map.height; y++)
+    {
+        for (int x = 0; x < rm_tex_map.width; x++)
+        {
+            if ((rm_map_pixels[y*rm_tex_map.width + x].r == 255) &&
+                (CheckCollisionCircleRec(playerPos, playerRadius,
+                (Rectangle){ rm_map_position.x - 0.5f + x*1.0f, rm_map_position.z - 0.5f + y*1.0f, 1.0f, 1.0f })))
+            {
+                rm_camera.position = oldCamPos;
+            }
+        }
+    }
+    return (rm_cell_x == rm_exit_x) && (rm_cell_y == rm_exit_y);
+}
+
+static void rm_draw_maze (void) {
+    BeginMode3D(rm_camera);
+        DrawModel(rm_model, rm_map_position, 1.0f, WHITE);
+        DrawCube((Vector3){ rm_map_position.x + (float)rm_exit_x, 0.5f, rm_map_position.z + (float)rm_exit_y }, 1.0f, 1.0f, 1.0f, ColorAlpha(GREEN, 0.5f));
+    EndMode3D();
+}
+
+static void rm_draw_minimap (int screenWidth, int screenHeight) {
+    DrawTextureEx(rm_tex_map, (Vector2){ screenWidth/2 - rm_tex_map.width*2, screenHeight/2 - rm_tex_map.height*2 }, 0.0f, 4.0f, WHITE);
+    DrawRectangle(screenWidth/2 - rm_tex_map.width*2 + rm_cell_x*4,screenHeight/2 - rm_tex_map.height*2 + rm_cell_y*4, 4, 4, GB_GREEN04);
+    DrawRectangle(screenWidth/2 - rm_tex_map.width*2 + rm_exit_x*4,screenHeight/2 - rm_tex_map.height*2 + rm_exit_y*4, 4, 4, LIME);
+}
+
+// The key G: the window in the case of a GPi (or back)
+static void rm_gpi (bool on, int screenWidth, int screenHeight) {
+    Vector2 currentWindowPos = GetWindowPosition();
+    if (on)
+    {
+        SetWindowState(FLAG_WINDOW_UNDECORATED);
+        SetWindowSize(480, 800);
+        SetWindowPosition(currentWindowPos.x - 79, currentWindowPos.y - 114);
+    }
+    else
+    {
+        ClearWindowState(FLAG_WINDOW_UNDECORATED);
+        SetWindowSize(screenWidth, screenHeight);
+        SetWindowPosition(currentWindowPos.x + 79, currentWindowPos.y + 114);
+    }
+}
+```
+
+val W, H = 320, 240
+val f32  = rl.f32
+val GREEN1, GREEN2, GREEN3 = 0x9BBC0FFF, 0x6E961BFF, 0x306230FF
+
+`SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_TRANSPARENT);`
+rl.window [title="RETRO MAZE 3D [GGJ 2021]", width=W, height=H, fps=60]
+
+pin tlogo       = rl.texture("resources/logo.png")
+pin ttitle      = rl.texture("resources/title.png")
+pin tshadow     = rl.texture("resources/title_shadow.png")
+pin t3d         = rl.texture("resources/title_3d.png")
+pin t3dshadow   = rl.texture("resources/title_3d_shadow.png")
+pin tlogo_small = rl.texture("resources/title_raylib_logo.png")
+pin tgpi        = rl.texture("resources/gpi_case_front.png")
+pin font        = rl.font("resources/alpha_beta.png")
+val SIZE = rl.font_size(font)
+rl.audio_init()
+pin fx_logo   = rl.sound("resources/audio/logo.wav")
+pin fx_move   = rl.sound("resources/audio/menu_move.wav")
+pin fx_select = rl.sound("resources/audio/menu_select.wav")
+pin fx_pause  = rl.sound("resources/audio/pause.wav")
+pin fx_rocks  = rl.sound("resources/audio/title_rocks.wav")
+pin fx_step   = rl.sound("resources/audio/step.wav")
+pin fx_ending = rl.sound("resources/audio/ending.wav")
+pin music_title    = rl.music("resources/audio/music_title.mp3")
+pin music_gameplay = rl.music("resources/audio/music_gameplay.mp3")
+pin music_credits  = rl.music("resources/audio/music_credits.mp3")
+`if (rl_music($music_credits)) rl_music($music_credits)->looping = false;`
+val VOICES = [
+    rl.sound("resources/audio/voice_hello.wav"),
+    rl.sound("resources/audio/voice_im_lost.wav"),
+    rl.sound("resources/audio/voice_anyone_there.wav"),
+    rl.sound("resources/audio/voice_can_you_hear_me.wav"),
+]
+`rm_load();`
+pin target = rl.render_texture(640, 480)
+rl.texture_filter(target, rl.FILTER_BILINEAR)
+`DisableCursor();`
+
+func measure (s, size) {
+    val w, _ = rl.measure_ex(font, s, size, 2)
+    w
+}
+func int (x) {                          ;; (int) of the C: towards zero
+    if x < 0 => math.ceil(x) => math.floor(x)
+}
+func center (s, y, size, c) {
+    rl.text_ex(font, s, (W//2) - (measure(s, size) / 2), y, size, 2, c)
+}
+
+;; What goes on from screen to screen, as the statics of the C: the title
+;; (where it is, how far its animation went), the option of the menus, the
+;; time and the stamina (never reset), the steps, the end.
+var y          = -128                   ;; elementPositionY
+var title      = 0                      ;; titleState (drawn)
+var option     = 0
+var seconds    = 300
+var stamina    = 100
+var steps      = 0
+var credits_y  = 240 + 20
+var result     = 0
+var moving     = false
+var paused, minimap = false, false
+var gpi        = false
+var exiting    = false
+var frames     = 0                      ;; the counter of the seconds of play
+
+;; The menus: DOWN and UP move the option (0 to 2); ENTER gives it.
+func menu () {
+    if rl.key_pressed('DOWN') {
+        set option += 1
+        rl.play_sound(fx_move)
+    } else {
+        if rl.key_pressed('UP') {
+            set option -= 1
+            rl.play_sound(fx_move)
+        }
+    }
+    set option = math.max(0, math.min(2, option))
+    if rl.key_pressed('ENTER') {
+        set frames = 0
+        rl.play_sound(fx_select)
+        option
+    } else {
+        nil
+    }
+}
+
+val CHOICES = [:gameplay, :credits, :exit]
+
+;; The logo goes down, with a sound when it arrives; 300 frames.
+task Logo () {
+    par :any {
+        loop on :rl.frame {
+            set y += 1
+            if y == ((H//2) - 64 - 1) { rl.play_sound(fx_logo) }
+            set y = math.min(y, (H//2) - 64)
+        }
+    } with {
+        await rl.Frames(301)
+    } with {
+        loop on :rl.draw {
+            rl.draw_texture(tlogo, (W//2) - 64, y, rl.WHITE)
+        }
+    }
+    set y = -rl.texture_width(ttitle)
+    rl.play_music(music_title)
+    :title
+}
+
+;; The title comes down, the 3D shows up (at once after 140 frames, as the
+;; C checks its counter twice); the menu all along.
+task Title () {
+    par :any {
+        loop on :rl.frame { rl.update_music(music_title) }
+    } with {
+        if title == 0 {
+            par :any {
+                loop on :rl.frame {
+                    set y = math.min(y + 2, 0)
+                }
+            } with {
+                await rl.Frames(141)
+            }
+            set title = 1
+            await :rl.frame
+        } else {
+            if title == 1 { await rl.Frames(141) }
+        }
+        if title != 2 {
+            set title = 2
+            rl.play_sound(fx_rocks)
+        }
+        await false
+    } with {
+        var choice = nil
+        loop on :rl.frame {
+            set choice = menu()
+            until choice
+        }
+        if choice == 0 {
+            `rm_start();`
+            rl.stop_music(music_title)
+            rl.play_music(music_gameplay)
+        } else {
+            if choice == 1 {
+                set credits_y = H + 20
+                rl.stop_music(music_title)
+                rl.play_music(music_credits)
+            } else {
+                set exiting = true
+                await :rl.draw
+            }
+        }
+        CHOICES@choice
+    } with {
+        loop on :rl.draw {
+            if title == 2 {
+                rl.draw_texture(tshadow, 32, 4, rl.WHITE)
+                rl.draw_texture(t3dshadow, 32, 90 + 4, rl.WHITE)
+            }
+            rl.draw_texture(ttitle, 32, y, rl.WHITE)
+            if title >= 1 { rl.draw_texture(t3d, 32, 90, rl.WHITE) }
+            rl.rectangle(95, 165 + (option * 16), 130, 16, GREEN2)
+            rl.text_ex(font, "START GAME", 120, 167, SIZE, 2, if option == 0 => GREEN3 => GREEN2)
+            rl.text_ex(font, "CREDITS", 132, 167 + 16, SIZE, 2, if option == 1 => GREEN3 => GREEN2)
+            rl.text_ex(font, "EXIT GAME", 124, 167 + 32, SIZE, 2, if option == 2 => GREEN3 => GREEN2)
+            rl.text_ex(font, "GGJ 2021", 10, 240 - 18, SIZE, 1, GREEN2)
+            rl.draw_texture(tlogo_small, 320 - rl.texture_width(tlogo_small) + 5, 240 - rl.texture_height(tlogo_small) + 3, rl.WHITE)
+        }
+    }
+}
+
+;; The maze, until the exit, the time or the stamina is over; SPACE pauses
+;; it with a menu (resume, back to the title, exit); M shows the map.
+task Gameplay () {
+    var next = nil
+    par :any {
+        loop on :rl.frame {
+            rl.update_music(music_gameplay)
+            if rl.key_pressed('SPACE') {
+                set paused = !paused
+                rl.play_sound(fx_pause)
+            }
+            if rl.key_pressed('M') { set minimap = !minimap }
+            if !paused {
+                if rl.key_pressed('V') { rl.play_sound(VOICES@(rl.random(0, 3))) }
+                val out = `:boolean rm_move()`
+                set moving = `:boolean rm_moving`
+                if out {
+                    set next, result = :ending, 1
+                    rl.play_sound(fx_ending)
+                    rl.stop_music(music_gameplay)
+                }
+                set frames += 1
+                if frames == 60 {
+                    set seconds -= 1
+                    set frames = 0
+                    if seconds == 0 {
+                        set next = :ending
+                        rl.play_sound(fx_ending)
+                        rl.stop_music(music_gameplay)
+                    }
+                }
+                if stamina < 0 {
+                    set next = :ending
+                    rl.play_sound(fx_ending)
+                    rl.stop_music(music_gameplay)
+                }
+            } else {
+                val choice = menu()
+                if choice == 0 { set paused = false }
+                if choice == 1 {
+                    set paused = false
+                    set next = :title
+                    rl.stop_music(music_gameplay)
+                    rl.play_music(music_title)
+                }
+                if choice == 2 { set next = :exit }
+            }
+            if moving {
+                set stamina = f32(stamina - f32(0.01))
+                set steps += 1
+                if (steps % 20) == 0 {
+                    rl.sound_pitch(fx_step, f32(f32(rl.random(80, 120)) / f32(100)))
+                    rl.play_sound(fx_step)
+                }
+            }
+            until next
+        }
+    } with {
+        loop on :rl.draw {
+            `rm_draw_maze();`
+            rl.rectangle(0, H - 20, W, 20, GREEN1)
+            rl.text_ex(font, "STAMINA:", 10, H - 16, SIZE, 1, GREEN3)
+            rl.rectangle_lines(70, H - 16, 100, 13, GREEN3)
+            rl.rectangle(70 + 2, H - 16 + 2, int(stamina) - 4, 13 - 4, GREEN2)
+            rl.text_ex(font, string.format("TIME: %d:%02ds", int(seconds / 60), seconds - (int(seconds / 60) * 60)), 240, H - 16, SIZE, 1, GREEN3)
+            if minimap {
+                `rm_draw_minimap(RL_I($W), RL_I($H));`
+            }
+            if paused {
+                rl.rectangle(0, 80, W, 84, GREEN1)
+                rl.rectangle((W//2) - 65, 100 + (option * 16), 130, 16, GREEN2)
+                center("RESUME GAME", 102, SIZE, if option == 0 => GREEN3 => GREEN2)
+                center("BACK TO TITLE", 102 + 16, SIZE, if option == 1 => GREEN3 => GREEN2)
+                center("EXIT GAME", 102 + 32, SIZE, if option == 2 => GREEN3 => GREEN2)
+            }
+        }
+    }
+    if next == :exit {
+        set exiting = true
+        await :rl.draw
+    }
+    next
+}
+
+;; The credits scroll up, until ENTER.
+task Credits () {
+    par :any {
+        loop on :rl.frame {
+            rl.update_music(music_credits)
+            set credits_y = math.max(f32(credits_y - f32(0.6)), -H + 36)
+            until rl.key_pressed('ENTER')
+        }
+    } with {
+        val G2, G3 = GREEN2, GREEN3
+        loop on :rl.draw {
+            val c = credits_y
+            center("GAME DESIGN", c, SIZE, G2)
+            center("Ramon Santamaria (Ray)", c + 16, SIZE, G3)
+            center("GAME PROGRAMMING", c + 50, SIZE, G2)
+            center("Ramon Santamaria (Ray)", c + 66, SIZE, G3)
+            center("GAME ART", c + 100, SIZE, G2)
+            center("Ramon Santamaria (Ray)", c + 116, SIZE, G3)
+            center("GAME AUDIO", c + 150, SIZE, G2)
+            rl.text_ex(font, "German Sartori", (W//2) - (measure("Germán Sartori", SIZE) / 2), c + 166, SIZE, 2, G3)
+            center("powered by", c + 240, SIZE, G2)
+            rl.draw_texture(tlogo, (W//2) - 64, c + 256, rl.WHITE)
+            rl.rectangle(W - 60, H - 24, 50, 16, G2)
+            rl.text_ex(font, "BACK", W - 50, H - 22, SIZE, 2, G3)
+        }
+    }
+    set title, frames = 0, 0
+    set y = -rl.texture_height(ttitle)
+    rl.play_sound(fx_select)
+    rl.stop_music(music_credits)
+    rl.play_music(music_title)
+    :title
+}
+
+;; The end, found or lost, until ENTER.
+task Ending () {
+    par :any {
+        await :rl.frame until rl.key_pressed('ENTER')
+    } with {
+        loop on :rl.draw {
+            center(if result == 1 => "YOU ARE FOUND!" => "YOU ARE LOST...", 100, SIZE * 2, GREEN3)
+            rl.rectangle((W//2) - 65, 170, 130, 16, GREEN2)
+            center("CONTINUE", 172, SIZE, GREEN3)
+        }
+    }
+    set title, frames, result = 0, 0, 0
+    rl.play_sound(fx_select)
+    set credits_y = H + 20
+    rl.play_music(music_credits)
+    :credits
+}
+
+val SCREENS = [logo=Logo, title=Title, gameplay=Gameplay, credits=Credits, ending=Ending]
+val NUMBER  = [logo=0, title=1, credits=2, gameplay=3, ending=4]
+var screen  = :logo
+
+;; the frame: the key G (after the screen, as the C), into the texture of
+;; 640x480, then to the window
+spawn {
+    loop on :rl.draw {
+        rl.begin_texture_mode(target)
+        rl.clear(GREEN1)
+    }
+}
+spawn {
+    loop on :rl.frame {
+        if rl.key_pressed('G') {
+            set gpi = !gpi
+            `rm_gpi(a_truthy($gpi), RL_I($W), RL_I($H));`
+        }
+    }
+}
+
+;; [trace] of the test mode: one line per frame, after its logic
+func b (x) { if x => 1 => 0 }
+spawn {
+    if rl.frame() > 0 {
+        loop on :rl.draw {
+            print(string.format("%d %d %d %d %d | %.4f %.4f %.4f %.4f %.4f %.4f | %d %d %d %.4f %d %d | %d %d %.4f %d %d %d",
+                rl.frame(), NUMBER@screen, title, y, option,
+                `:number rm_camera.position.x`, `:number rm_camera.position.y`, `:number rm_camera.position.z`,
+                `:number rm_camera.target.x`, `:number rm_camera.target.y`, `:number rm_camera.target.z`,
+                `:number rm_cell_x`, `:number rm_cell_y`, seconds, stamina, b(moving), steps,
+                b(paused), b(minimap), credits_y, result, b(gpi), b(exiting)))
+        }
+    }
+}
+;; [/trace]
+
+pin main = spawn {
+    loop {
+        pin s = spawn (SCREENS@screen)()
+        set screen = await(s)
+        until screen == :exit
+    }
+}
+spawn {
+    loop on :rl.draw {
+        rl.end_texture_mode()
+        rl.clear(GREEN1)
+        if gpi {
+            rl.clear(0x00000000)
+            rl.draw_texture(tgpi, 0, 0, rl.WHITE)
+            `BeginScissorMode(79, 114, 320, 240);`
+            rl.draw_texture_rec(target, 0, 0, 640, -480, 79, 114, rl.WHITE)
+            `EndScissorMode();`
+        } else {
+            rl.draw_texture_rec(target, 0, 0, 640, -480, 0, 0, rl.WHITE)
+        }
+    }
+}
+await(main)
