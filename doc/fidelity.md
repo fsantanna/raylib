@@ -494,3 +494,25 @@ port.
 - What builds data from files and images is the C of the original, in a
   prelude: the missions (`LoadMissions`), the atlas of the words, the
   layout of the message, the headline on the newspaper.
+
+## drturtle
+
+Same as the original on its runs `start` (700 frames, 8 screens: the
+title and its blink, a game lost without a move, the end, a second game)
+and `play` (3000 frames, 9 screens). `play` is made by `tst/drturtle/gen.py`,
+which simulates the game, with the generator of raylib (rprand), to steer
+the turtle: five fish, GAMERA mode from frame 841 to 1529 with bad ones
+eaten (a score of 1500), a death at 2386, the end, and a second game.
+
+Trace: frame, screen, rail, score, distance, food, GAMERA mode, speed, the
+two scrolls, the blue of the sea, the active enemies (slot, type, rail, x),
+and the best score and distance.
+
+- **The death ends the frame.** The C goes on with the frame after the
+  death (the other enemies, the food, the distance): the distance shown at
+  the end is half a unit more than the best distance, taken at the death.
+  The port does the same: the game ends after the frame.
+- **The slots.** An enemy takes the first free slot, and a new rail is
+  never that of the slot before; the port keeps the slots.
+- The floats of the C (`enemySpeed`, `seaScrolling -= enemySpeed - 2`,
+  the blue of the sea from `sinf`) are computed in 32 bits.
