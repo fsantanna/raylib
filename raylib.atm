@@ -301,6 +301,17 @@ static AStatus rl_emit_mouse (const char* tag, int button) {
     return rl_emit(tag, e);
 }
 
+// The tags of the events that the driver emits, all in one place (they
+// are to lose their prefix, see .claude/plans/TODO.md)
+static const char* RL_EV_KEY_DN   = "rl.key.dn";      // [key=, name=]
+static const char* RL_EV_KEY_UP   = "rl.key.up";      // [key=, name=]
+static const char* RL_EV_MOUSE_DN = "rl.mouse.dn";    // [button=, x=, y=]
+static const char* RL_EV_MOUSE_UP = "rl.mouse.up";    // [button=, x=, y=]
+static const char* RL_EV_WHEEL    = "rl.wheel";
+static const char* RL_EV_QUIT     = "rl.quit";
+static const char* RL_EV_FRAME    = "rl.frame";
+static const char* RL_EV_DRAW     = "rl.draw";
+
 // The input of this frame, as events: keys pressed in their order, keys
 // released, mouse buttons, wheel.
 static AStatus rl_input (void) {
@@ -311,26 +322,26 @@ static AStatus rl_input (void) {
         keys[n++] = k;
     }
     for (int i=0; i<n && st==A_OK; i++) {
-        st = rl_emit_key("rl.key.dn", keys[i]);
+        st = rl_emit_key(RL_EV_KEY_DN, keys[i]);
     }
     for (int i=0; i<RL_NKEYS && st==A_OK; i++) {
         if (IsKeyReleased(RL_KEY_CODES[i])) {
-            st = rl_emit_key("rl.key.up", RL_KEY_CODES[i]);
+            st = rl_emit_key(RL_EV_KEY_UP, RL_KEY_CODES[i]);
         }
     }
     for (int b=0; b<=MOUSE_BUTTON_BACK && st==A_OK; b++) {
         if (IsMouseButtonPressed(b)) {
-            st = rl_emit_mouse("rl.mouse.dn", b);
+            st = rl_emit_mouse(RL_EV_MOUSE_DN, b);
         }
         if (st==A_OK && IsMouseButtonReleased(b)) {
-            st = rl_emit_mouse("rl.mouse.up", b);
+            st = rl_emit_mouse(RL_EV_MOUSE_UP, b);
         }
     }
     float dy = GetMouseWheelMove();
     if (st==A_OK && dy!=0.0f) {
         AVal e = a_tab();
         rl_set(e, "dy", a_num(dy));
-        st = rl_emit("rl.wheel", e);
+        st = rl_emit(RL_EV_WHEEL, e);
     }
     return st;
 }
@@ -345,7 +356,7 @@ int main (int argc, char** argv) {
     int64_t prv = llround(GetTime() * 1e6);
     while (st==A_OK && atm_alive()) {
         if (WindowShouldClose()) {
-            st = rl_emit("rl.quit", a_nil());
+            st = rl_emit(RL_EV_QUIT, a_nil());
             break;
         }
         st = rl_input();
@@ -355,11 +366,11 @@ int main (int argc, char** argv) {
         }
         prv = now;
         if (st == A_OK) {
-            st = rl_emit("rl.frame", a_nil());
+            st = rl_emit(RL_EV_FRAME, a_nil());
         }
         BeginDrawing();
         if (st == A_OK) {
-            st = rl_emit("rl.draw", a_nil());
+            st = rl_emit(RL_EV_DRAW, a_nil());
         }
         EndDrawing();
     }
