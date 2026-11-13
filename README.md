@@ -10,7 +10,7 @@ The port must stay the same game: the same screens at the same frames, with
 the same seed and the same input.
 
 [games]:  https://github.com/raysan5/raylib-games
-[atmos]:  https://github.com/fsantanna/ceu-atmos
+[atmos]:  https://github.com/ia-atmos/lang
 [raylib]: https://github.com/raysan5/raylib
 
 ## Credits

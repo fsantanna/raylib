@@ -1,6 +1,6 @@
 # Findings in the compiler
 
-What the port found in `fsantanna/ceu-atmos`, reported here instead of being
+What the port found in `ia-atmos/lang` (formerly `fsantanna/ceu-atmos`), reported here instead of being
 worked around in silence. The compiler is maintained by its own session.
 
 | # | Found in | Finding | What the port does |

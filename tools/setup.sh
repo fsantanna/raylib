@@ -25,7 +25,7 @@ if [ ! -d ext/raylib-games ]; then
     git -C ext/raylib-games checkout -q $GAMES_REV
 fi
 if [ ! -d ext/ceu-atmos ]; then
-    git clone -q https://github.com/fsantanna/ceu-atmos ext/ceu-atmos
+    git clone -q https://github.com/ia-atmos/lang ext/ceu-atmos
 fi
 
 # raylib: the patch, unless it is already applied

@@ -1,7 +1,7 @@
 # TODO
 
 Everything that is pending in the session that ports the raylib games to
-Atmos (`fsantanna/raylib`): asked and not decided, reported and not
+Atmos (`ia-atmos/env-ray`): asked and not decided, reported and not
 acknowledged, or known and not done. Keep it current: remove an item when
 it is settled, add one whenever something is left open, in the same commit
 when possible.
@@ -16,11 +16,12 @@ Each has the option recommended by this session.
 
 | # | Decision | Recommended |
 |---|----------|-------------|
-| 1 | The compiler moved to `ia-atmos/lang`, and this repository to `ia-atmos/raylib` (GitHub says so on push; the old addresses redirect): point the checkout of the compiler (`ext/ceu-atmos`) and the remote of this repository there, and rename them in `README.md`, `doc/compiler.md`, `tools/setup.sh`. The change of the remote was refused by the permissions of this session (auto mode); the old address redirects | Wait for the renaming of the repositories of `ia-atmos` (item 47 of the compiler), then do both in one commit. The author allows the change of the remote, or runs `git -C ext/ceu-atmos remote set-url origin https://github.com/ia-atmos/lang` |
-| 2 | `await(n, :e)` of the compiler (the nth occurrence, no allocation) instead of the task `rl.Frames(n)` of `raylib.atm`, used by most ports | Adopt it: `rl.Frames` becomes `await(n, :rl.frame)`, then the 55 runs again (34 min). After item 1 |
+| 1 | The remotes: this repository is now `ia-atmos/env-ray`, the compiler `ia-atmos/lang` (the old addresses redirect; the names in `README.md`, `doc/compiler.md`, `tools/setup.sh` are updated). The remote of this checkout and of `ext/ceu-atmos` still name the old addresses: changing a remote is refused by the permissions of this session (auto mode) | The author allows it, or runs `git remote set-url origin https://github.com/ia-atmos/env-ray` and `git -C ext/ceu-atmos remote set-url origin https://github.com/ia-atmos/lang`. Not urgent: pushes still go through |
+| 2 | `await(n, :e)` of the compiler (the nth occurrence, no allocation) instead of the task `rl.Frames(n)` of `raylib.atm`, used by most ports | Adopt it: `rl.Frames` becomes `await(n, :rl.frame)`, then the 55 runs again (34 min). |
 | 3 | The tags of the events across bindings (item 46 of the compiler): `raylib.atm` has `:rl.frame`, `:rl.draw`, `:rl.key.dn`; `pico.atm` has no prefix | Keep a prefix: a program may use two bindings; but follow the convention the author decides, here and in the 23 ports at once |
-| 4 | Split this repository into the binding (`raylib.atm`, `games/screens.atm`, the test mode) and the 23 games (item 47 of the compiler), so that Lessmilk drops its patched copy of `raylib.atm` | Split, and offer the binding to `ia-atmos/lang` as `lib/raylib.atm`, as the plan says; merge the patch of Lessmilk into it first |
 | 5 | The original of koala_seasons reads the date (`time`), so its runs are not repeatable; the test mode fixes it, by a patch of the original (`tools/original.patch`) and the same in the port | Keep it, as written in `doc/fidelity.md` |
+| 20 | With the repository named `env-ray`, whether the binding follows the name: `raylib.atm` to `ray.atm`, the table `rl` to `ray`, the prefix `:rl.` of the events to `:ray.`; or stays. It touches the 23 ports, the generators and Lessmilk | Stay with `raylib.atm`, `rl` and `:rl.`: the binding is named after the library it binds, and the short `rl` is the prefix raylib itself uses in its C (`rlgl`, `rl*`). Decide it with item 3, both at once |
+| 21 | Lessmilk (`ia-atmos/ray-lessmilk`) carries a patched copy of `raylib.atm` (item 47 of the compiler); the repository was not split | Merge its patch into `raylib.atm` here, so it can use the file as it is |
 
 ## B. Work known and not done
 
@@ -31,6 +32,7 @@ Each has the option recommended by this session.
 | 8 | `tools/compare-all.sh`, every run against the original, run only on snake | One run of all, a few hours |
 | 9 | A stress case of `raylife` | Not made: its board is C in the port too |
 | 10 | The CPU at 60 fps in `doc/bench.md` is derived from the CPU per frame, not measured apart | Measure it with the frame cap, if it matters |
+| 22 | `tools/raylib.patch` names the repository by its old name in a comment that it adds to raylib (`fsantanna/raylib`) | Change it with the next change of the patch: editing it alone means rebuilding raylib for a comment |
 | 11 | Differences that no run shows, kept as documented: snake (two keys in one frame), gold_fever (ENTER in the frame of the last coin), skully_escape (a door taken during the 80 frames of a death) | See `doc/fidelity.md` |
 
 ## C. Reported and not acknowledged
